@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CampLog · 캠핑 준비 노트</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bark:#2f3e34;        /* 진한 숲 초록 */
+    --moss:#5c7a5a;        /* 이끼색 */
+    --sage:#8ba888;        /* 연한 세이지 */
+    --canvas:#eae3d2;      /* 텐트 캔버스색 배경 */
+    --paper:#f6f1e4;       /* 종이색 카드 */
+    --ink:#25302a;         /* 글자색 */
+    --ember:#c96f3f;       /* 모닥불 주황 */
+    --dusk:#3a5169;        /* 해질녘 파랑 */
+    --line:#d8cfb8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    background:var(--canvas);
+    color:var(--ink);
+    line-height:1.6;
+    /* 배경에 지형 등고선 느낌의 은은한 무늬 */
+    background-image:
+      radial-gradient(circle at 20% 12%, rgba(139,168,136,.18), transparent 42%),
+      radial-gradient(circle at 82% 78%, rgba(201,111,63,.10), transparent 40%);
+    min-height:100vh;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:20px 16px 64px}
+
+  /* ---- 머리말 ---- */
+  header.top{
+    text-align:center;
+    padding:26px 16px 22px;
+  }
+  .badge{
+    display:inline-block;
+    font-size:12px;letter-spacing:.32em;
+    color:var(--moss);text-transform:uppercase;
+    border:1px solid var(--sage);
+    border-radius:999px;
+    padding:5px 14px;
+    margin-bottom:14px;
+  }
+  header.top h1{
+    font-family:Georgia,"Nanum Myeongjo",serif;
+    font-size:clamp(30px,7vw,46px);
+    color:var(--bark);
+    font-weight:700;
+    letter-spacing:-.01em;
+    line-height:1.15;
+  }
+  header.top .sub{
+    margin-top:8px;color:var(--moss);font-size:15px;
+  }
+  /* 머리말 캠핑 장면 그림 */
+  .scene{
+    max-width:520px;margin:16px auto 0;
+    border-radius:16px;overflow:hidden;
+    border:1px solid var(--line);
+    box-shadow:0 10px 26px -18px rgba(47,62,52,.5);
+    line-height:0;
+  }
+
+  /* ---- 카드 공통 ---- */
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:20px;
+    margin-top:18px;
+    box-shadow:0 2px 0 rgba(47,62,52,.04), 0 10px 24px -18px rgba(47,62,52,.4);
+  }
+  .card h2{
+    font-family:Georgia,"Nanum Myeongjo",serif;
+    font-size:20px;color:var(--bark);
+    display:flex;align-items:center;gap:9px;
+    margin-bottom:4px;
+  }
+  .card h2 .ico{font-size:20px;line-height:1}
+  .card .hint{color:var(--moss);font-size:13.5px;margin-bottom:14px}
+
+  label.fld{display:block;font-size:13px;color:var(--bark);font-weight:600;margin:12px 0 5px}
+  input,select,textarea{
+    width:100%;
+    font-family:inherit;font-size:15px;color:var(--ink);
+    background:#fffdf7;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:11px 12px;
+  }
+  input:focus,select:focus,textarea:focus,button:focus-visible{
+    outline:2px solid var(--moss);outline-offset:1px;
+  }
+  textarea{resize:vertical;min-height:70px}
+
+  .btn{
+    font-family:inherit;font-size:15px;font-weight:600;
+    border:none;border-radius:10px;cursor:pointer;
+    padding:11px 16px;transition:transform .05s ease, filter .15s ease;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-main{background:var(--moss);color:#fff}
+  .btn-main:hover{filter:brightness(1.06)}
+  .btn-ember{background:var(--ember);color:#fff}
+  .btn-ember:hover{filter:brightness(1.06)}
+  .btn-ghost{background:transparent;border:1px solid var(--sage);color:var(--bark)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.two{grid-template-columns:1fr}}
+
+  /* ---- 지도 ---- */
+  #map{height:300px;border-radius:12px;border:1px solid var(--line);margin-top:6px;z-index:0}
+  .place-name{margin-top:12px;font-size:15px;color:var(--bark)}
+  .place-name b{color:var(--ember)}
+
+  /* ---- 날씨 ---- */
+  .wx-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+    gap:10px;margin-top:6px;
+  }
+  .wx-day{
+    background:linear-gradient(180deg,#fffdf7,#f1ead8);
+    border:1px solid var(--line);border-radius:12px;
+    padding:12px 8px;text-align:center;
+  }
+  .wx-day .d{font-size:12.5px;color:var(--moss);font-weight:600}
+  .wx-day .emo{font-size:26px;margin:6px 0}
+  .wx-day .t{font-size:14px;color:var(--ink)}
+  .wx-day .t .hi{color:var(--ember);font-weight:700}
+  .wx-day .t .lo{color:var(--dusk)}
+  .wx-day .rain{font-size:11.5px;color:var(--dusk);margin-top:3px}
+  .wx-note{margin-top:12px;font-size:13.5px;color:var(--moss);
+    background:#fff9ec;border:1px dashed var(--sage);border-radius:10px;padding:10px 12px}
+
+  /* ---- 체크리스트 ---- */
+  .chk-cats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .chk-cat{
+    font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--sage);background:transparent;color:var(--bark);
+  }
+  .chk-cat.on{background:var(--bark);color:#fff;border-color:var(--bark)}
+  ul.checklist{list-style:none;margin-top:4px}
+  ul.checklist li{
+    display:flex;align-items:center;gap:11px;
+    padding:10px 6px;border-bottom:1px solid var(--line);
+  }
+  ul.checklist li:last-child{border-bottom:none}
+  ul.checklist input[type=checkbox]{
+    width:20px;height:20px;flex:0 0 auto;accent-color:var(--moss);cursor:pointer;
+  }
+  ul.checklist li span.txt{flex:1;font-size:15px}
+  ul.checklist li.done span.txt{text-decoration:line-through;color:#9c9684}
+  ul.checklist li .del{background:none;border:none;color:#b6ab90;font-size:18px;cursor:pointer;padding:2px 6px}
+  ul.checklist li .del:hover{color:var(--ember)}
+  .add-row{display:flex;gap:8px;margin-top:12px}
+  .add-row input{flex:1}
+  .progress{
+    height:10px;background:#e5dcc4;border-radius:999px;overflow:hidden;margin:12px 0 4px;
+  }
+  .progress > i{display:block;height:100%;background:var(--moss);width:0;transition:width .3s ease}
+  .progress-label{font-size:12.5px;color:var(--moss)}
+
+  /* ---- 장보기 ---- */
+  ul.shop{list-style:none;margin-top:6px}
+  ul.shop li{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 4px;border-bottom:1px solid var(--line);
+  }
+  ul.shop li:last-child{border-bottom:none}
+  ul.shop input[type=checkbox]{width:19px;height:19px;accent-color:var(--ember);cursor:pointer}
+  ul.shop li span{flex:1;font-size:15px}
+  ul.shop li.got span{text-decoration:line-through;color:#9c9684}
+  ul.shop li .del{background:none;border:none;color:#b6ab90;font-size:18px;cursor:pointer}
+  ul.shop li .del:hover{color:var(--ember)}
+
+  /* ---- 저장된 캠핑 ---- */
+  .trip{
+    border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;
+    background:#fffdf7;
+  }
+  .trip .th{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .trip .th b{font-size:16px;color:var(--bark)}
+  .trip-group{margin-top:16px}
+  .trip-group:first-child{margin-top:6px}
+  .group-title{
+    font-family:Georgia,"Nanum Myeongjo",serif;
+    font-size:15.5px;color:var(--bark);font-weight:700;
+    padding:8px 2px;border-bottom:2px solid var(--sage);margin-bottom:4px;
+    display:flex;align-items:baseline;gap:8px;
+  }
+  .group-title small{font-size:12px;color:var(--moss);font-weight:400}
+  .trip .th .when{font-size:13px;color:var(--moss);white-space:nowrap}
+  .trip .meta{font-size:13.5px;color:#6f6a58;margin-top:4px}
+  .trip .tbtns{display:flex;gap:8px;margin-top:10px}
+  .trip .tbtns button{font-size:13px;padding:7px 12px}
+  .empty{color:#9c9684;font-size:14px;text-align:center;padding:14px}
+
+  /* ---- 데크 배치도 (사진+핀) ---- */
+  .deck-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#6f6a58;margin:12px 0 8px}
+  .deck-legend span{display:inline-flex;align-items:center;gap:6px}
+  .deck-stage{margin-top:6px}
+  .deck-empty{
+    background:linear-gradient(180deg,#e7efe0,#dbe7d3);
+    border:1px dashed var(--sage);border-radius:14px;
+    padding:40px 20px;text-align:center;color:#5c7a5a;font-size:14.5px;line-height:1.7;
+  }
+  .deck-canvas{
+    position:relative;display:inline-block;width:100%;
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    background:#fffdf7;line-height:0;
+  }
+  .deck-canvas img{width:100%;display:block;cursor:crosshair}
+  .pin-layer{position:absolute;inset:0;line-height:normal}
+  .pin{
+    position:absolute;transform:translate(-50%,-100%);
+    font-size:26px;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));
+    z-index:2;
+  }
+  .pin .cap{
+    position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    background:var(--ember);color:#fff;font-size:11px;font-weight:700;
+    padding:1px 6px;border-radius:999px;white-space:nowrap;
+  }
+  .pin:hover{filter:drop-shadow(0 0 4px var(--ember))}
+  .deck-picked{margin-top:14px;font-size:14px;color:var(--bark);
+    background:#fff9ec;border:1px dashed var(--sage);border-radius:10px;padding:11px 13px;display:none}
+  .deck-picked.show{display:block}
+  .deck-picked b{color:var(--ember)}
+
+  /* ---- 정산 ---- */
+  .split-members{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+  .member-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    background:#fffdf7;border:1px solid var(--sage);border-radius:999px;
+    padding:6px 8px 6px 13px;font-size:14px;color:var(--bark);
+  }
+  .member-chip button{background:none;border:none;color:#b6ab90;font-size:16px;cursor:pointer;line-height:1;padding:0 2px}
+  .member-chip button:hover{color:var(--ember)}
+  .expense{
+    border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;background:#fffdf7;
+  }
+  .expense .er1{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .expense .er1 > div{flex:1;min-width:110px}
+  .expense .er1 .del-exp{background:none;border:none;color:#b6ab90;font-size:20px;cursor:pointer;padding:4px 6px}
+  .expense .er1 .del-exp:hover{color:var(--ember)}
+  .expense .sharers{margin-top:10px}
+  .expense .sharers .lbl2{font-size:12.5px;color:var(--moss);margin-bottom:6px}
+  .share-picks{display:flex;flex-wrap:wrap;gap:7px}
+  .share-pick{
+    font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;user-select:none;
+    border:1px solid var(--sage);background:transparent;color:var(--bark);
+  }
+  .share-pick.on{background:var(--moss);color:#fff;border-color:var(--moss)}
+  .settle-box{
+    margin-top:16px;background:linear-gradient(180deg,#fff9ec,#f4ecd7);
+    border:1px solid var(--line);border-radius:14px;padding:16px;
+  }
+  .settle-box h3{font-family:Georgia,"Nanum Myeongjo",serif;font-size:16px;color:var(--bark);margin-bottom:10px}
+  .settle-total{font-size:14px;color:#6f6a58;margin-bottom:12px}
+  .settle-total b{color:var(--bark)}
+  .settle-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+  .settle-row:last-child{border-bottom:none}
+  .settle-row .who{color:var(--bark)}
+  .settle-row .amt{font-weight:700}
+  .settle-row .amt.plus{color:var(--moss)}
+  .settle-row .amt.minus{color:var(--ember)}
+  .transfers{margin-top:14px}
+  .transfer-line{
+    background:#fffdf7;border:1px solid var(--line);border-radius:10px;
+    padding:11px 13px;margin-top:8px;font-size:14.5px;color:var(--bark);
+  }
+  .transfer-line b{color:var(--ember)}
+  .transfer-line .arrow{color:var(--moss);margin:0 6px}
+  .settle-empty{color:#9c9684;font-size:14px;text-align:center;padding:14px}
+
+  /* ---- 파일 올리기 ---- */
+  .file-import{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:#fff9ec;border:1px dashed var(--sage);border-radius:10px;
+    padding:10px 12px;margin:12px 0 2px;
+  }
+  .file-import .imp-btn{
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    background:var(--dusk);color:#fff;border:none;border-radius:8px;padding:8px 13px;white-space:nowrap;
+  }
+  .file-import .imp-btn:hover{filter:brightness(1.08)}
+  .file-import .imp-help{font-size:12.5px;color:#6f6a58;line-height:1.5}
+  .file-import .imp-help b{color:var(--dusk)}
+
+  footer.foot{text-align:center;color:var(--moss);font-size:12.5px;margin-top:30px}
+  .save-note{font-size:12.5px;color:var(--moss);margin-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="badge">Camp · Log</div>
+    <h1>CampLog</h1>
+    <div class="sub">떠나기 전, 준비를 차분히 챙겨 두는 캠핑 노트</div>
+
+    <div class="scene" aria-hidden="true">
+      <svg viewBox="0 0 640 260" width="100%" height="100%" preserveAspectRatio="xMidYMax meet" role="img" aria-label="숲 속 텐트와 테이블·의자 두 세트">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#dfeadb"/>
+            <stop offset="1" stop-color="#eae3d2"/>
+          </linearGradient>
+          <linearGradient id="tent" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#d97f4c"/>
+            <stop offset="1" stop-color="#c96f3f"/>
+          </linearGradient>
+        </defs>
+
+        <!-- 하늘 -->
+        <rect x="0" y="0" width="640" height="260" fill="url(#sky)"/>
+        <!-- 해 -->
+        <circle cx="540" cy="58" r="26" fill="#e6c27a" opacity="0.85"/>
+
+        <!-- 뒤쪽 나무들(숲) -->
+        <g fill="#5c7a5a" opacity="0.5">
+          <polygon points="60,180 90,110 120,180"/>
+          <polygon points="95,185 130,95 165,185"/>
+          <polygon points="450,180 485,105 520,180"/>
+          <polygon points="500,185 540,120 580,185"/>
+        </g>
+        <!-- 앞쪽 나무들 -->
+        <g>
+          <g transform="translate(150,60)">
+            <rect x="-6" y="95" width="12" height="30" fill="#7a5a3c"/>
+            <polygon points="0,0 -46,70 46,70" fill="#4a6349"/>
+            <polygon points="0,32 -40,100 40,100" fill="#5c7a5a"/>
+          </g>
+          <g transform="translate(470,70)">
+            <rect x="-6" y="85" width="12" height="28" fill="#7a5a3c"/>
+            <polygon points="0,0 -42,64 42,64" fill="#4a6349"/>
+            <polygon points="0,28 -36,92 36,92" fill="#5c7a5a"/>
+          </g>
+        </g>
+
+        <!-- 땅 -->
+        <ellipse cx="320" cy="240" rx="360" ry="46" fill="#8ba888" opacity="0.55"/>
+        <rect x="0" y="222" width="640" height="38" fill="#7f9a72" opacity="0.4"/>
+
+        <!-- 텐트 (가운데) -->
+        <g transform="translate(258,120)">
+          <ellipse cx="62" cy="106" rx="86" ry="12" fill="#000" opacity="0.08"/>
+          <polygon points="62,0 4,104 120,104" fill="url(#tent)"/>
+          <polygon points="62,0 44,104 4,104" fill="#b5602f" opacity="0.55"/>
+          <polygon points="62,18 40,104 84,104" fill="#f2ead7"/>
+          <polygon points="62,18 62,104 84,104" fill="#e4d9bf"/>
+          <line x1="62" y1="-4" x2="62" y2="6" stroke="#7a5a3c" stroke-width="3"/>
+        </g>
+
+        <!-- 왼쪽 테이블+의자 2세트 중 1 -->
+        <g transform="translate(96,168)">
+          <!-- 의자 -->
+          <g stroke="#6f5236" stroke-width="4" fill="none">
+            <rect x="-2" y="6" width="16" height="14" rx="2" fill="#7a8b6a" stroke="none"/>
+            <line x1="-2" y1="20" x2="-2" y2="34"/><line x1="14" y1="20" x2="14" y2="34"/>
+          </g>
+          <!-- 테이블 -->
+          <g>
+            <rect x="18" y="10" width="52" height="7" rx="2" fill="#9c7a4f"/>
+            <line x1="24" y1="17" x2="24" y2="40" stroke="#6f5236" stroke-width="4"/>
+            <line x1="64" y1="17" x2="64" y2="40" stroke="#6f5236" stroke-width="4"/>
+          </g>
+          <!-- 반대쪽 의자 -->
+          <g stroke="#6f5236" stroke-width="4" fill="none">
+            <rect x="74" y="6" width="16" height="14" rx="2" fill="#7a8b6a" stroke="none"/>
+            <line x1="76" y1="20" x2="76" y2="34"/><line x1="90" y1="20" x2="90" y2="34"/>
+          </g>
+        </g>
+
+        <!-- 오른쪽 테이블+의자 2세트 중 2 -->
+        <g transform="translate(430,176)">
+          <g stroke="#6f5236" stroke-width="4" fill="none">
+            <rect x="-2" y="6" width="16" height="14" rx="2" fill="#8a6b8f" stroke="none"/>
+            <line x1="-2" y1="20" x2="-2" y2="34"/><line x1="14" y1="20" x2="14" y2="34"/>
+          </g>
+          <g>
+            <rect x="18" y="10" width="52" height="7" rx="2" fill="#9c7a4f"/>
+            <line x1="24" y1="17" x2="24" y2="40" stroke="#6f5236" stroke-width="4"/>
+            <line x1="64" y1="17" x2="64" y2="40" stroke="#6f5236" stroke-width="4"/>
+          </g>
+          <g stroke="#6f5236" stroke-width="4" fill="none">
+            <rect x="74" y="6" width="16" height="14" rx="2" fill="#8a6b8f" stroke="none"/>
+            <line x1="76" y1="20" x2="76" y2="34"/><line x1="90" y1="20" x2="90" y2="34"/>
+          </g>
+        </g>
+
+        <!-- 모닥불 -->
+        <g transform="translate(320,214)">
+          <ellipse cx="0" cy="8" rx="20" ry="5" fill="#000" opacity="0.08"/>
+          <path d="M0,-14 C7,-4 9,2 4,8 C10,4 9,-3 6,-8 C10,-2 12,6 3,11 C-6,12 -11,4 -6,-3 C-4,2 -2,3 0,2 C-3,-4 -2,-9 0,-14 Z" fill="#e08a3c"/>
+          <path d="M0,-6 C4,-1 4,4 0,8 C-4,4 -4,0 0,-6 Z" fill="#f4c65a"/>
+          <line x1="-14" y1="12" x2="14" y2="12" stroke="#7a5a3c" stroke-width="4" stroke-linecap="round"/>
+          <line x1="-12" y1="14" x2="16" y2="10" stroke="#6f5236" stroke-width="4" stroke-linecap="round"/>
+        </g>
+      </svg>
+    </div>
+  </header>
+
+  <!-- 1. 캠핑장 찾기 & 지도 -->
+  <section class="card">
+    <h2><span class="ico">🏕️</span> 캠핑장 찾기</h2>
+    <p class="hint">가고 싶은 캠핑장 이름이나 지역을 적고 ‘지도에서 찾기’를 누르면, 아래 지도에 위치가 표시돼요.</p>
+    <label class="fld" for="placeInput">캠핑장 이름 또는 지역</label>
+    <input id="placeInput" placeholder="예) 가평 자라섬 오토캠핑장" />
+    <div class="btn-row">
+      <button class="btn btn-main" id="findBtn">지도에서 찾기</button>
+      <button class="btn btn-ghost" id="myLocBtn">내 위치로</button>
+    </div>
+    <div class="place-name" id="placeName"></div>
+    <div id="map"></div>
+  </section>
+
+  <!-- 2. 날씨 -->
+  <section class="card">
+    <h2><span class="ico">⛅</span> 캠핑장 날씨</h2>
+    <p class="hint">위에서 캠핑장을 찾으면 그곳의 날씨를, 아직 안 찾았으면 ‘내 위치로’ 눌러 지금 있는 곳 날씨를 볼 수 있어요.</p>
+    <div class="btn-row">
+      <button class="btn btn-ember" id="wxBtn">날씨 불러오기</button>
+    </div>
+    <div class="wx-grid" id="wxGrid"></div>
+    <div class="wx-note" id="wxNote" style="display:none"></div>
+  </section>
+
+  <!-- 3. 준비물 체크리스트 -->
+  <section class="card">
+    <h2><span class="ico">🎒</span> 준비물 체크리스트</h2>
+    <p class="hint">기본 준비물을 미리 담아 뒀어요. 챙긴 건 왼쪽 네모를 눌러 체크하고, 필요한 물건은 아래에서 더 넣으세요.</p>
+    <div class="chk-cats" id="chkCats"></div>
+    <div class="progress"><i id="progBar"></i></div>
+    <div class="progress-label" id="progLabel">0개 중 0개 챙김</div>
+    <ul class="checklist" id="checklist"></ul>
+    <div class="add-row">
+      <input id="chkInput" placeholder="준비물 추가 (예: 손전등)" />
+      <button class="btn btn-main" id="chkAdd">추가</button>
+    </div>
+    <div class="file-import">
+      <label class="imp-btn" for="chkFile">엑셀·CSV 올리기</label>
+      <input id="chkFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
+      <span class="imp-help">엑셀 <b>첫 칸에 준비물 이름</b>, 둘째 칸에 분류(선택). 한 줄에 하나씩. 올리면 목록에 더해져요.</span>
+    </div>
+  </section>
+
+  <!-- 4. 장보기 메모 -->
+  <section class="card">
+    <h2><span class="ico">🛒</span> 장보기 메모</h2>
+    <p class="hint">마트에서 살 것들을 적어 두세요. 담은 물건은 체크하면 줄이 그어져요.</p>
+    <ul class="shop" id="shopList"></ul>
+    <div class="add-row">
+      <input id="shopInput" placeholder="살 것 추가 (예: 삼겹살 2근)" />
+      <button class="btn btn-ember" id="shopAdd">추가</button>
+    </div>
+    <div class="file-import">
+      <label class="imp-btn" for="shopFile">엑셀·CSV 올리기</label>
+      <input id="shopFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
+      <span class="imp-help">엑셀 <b>첫 칸에 살 것</b>을 한 줄에 하나씩. 올리면 목록에 더해져요.</span>
+    </div>
+  </section>
+
+  <!-- 5. 데크 배치도 (사진) -->
+  <section class="card">
+    <h2><span class="ico">🗺️</span> 데크 배치도</h2>
+    <p class="hint">캠핑장 배치도 사진을 올리고, 예약한 자리를 사진 위에서 톡 누르면 텐트 핀이 꽂혀요. 자리를 여러 개 찍을 수도 있어요.</p>
+    <div class="btn-row">
+      <label class="btn btn-main" for="deckImgInput" style="display:inline-block">배치도 사진 올리기</label>
+      <input id="deckImgInput" type="file" accept="image/*" style="display:none" />
+      <button class="btn btn-ghost" id="deckUndo">마지막 핀 지우기</button>
+      <button class="btn btn-ghost" id="deckClearAll">핀 전부 지우기</button>
+    </div>
+    <div class="deck-legend">
+      <span>⛺ 눌러서 찍은 내 자리</span>
+      <span>핀을 누르면 그 핀만 지워져요</span>
+    </div>
+    <div class="deck-stage" id="deckStage">
+      <div class="deck-empty" id="deckEmpty">아직 배치도 사진이 없어요.<br>‘배치도 사진 올리기’를 눌러 캠핑장 배치도를 올려 주세요.</div>
+      <div class="deck-canvas" id="deckCanvas" style="display:none">
+        <img id="deckImg" alt="캠핑장 배치도" />
+        <div class="pin-layer" id="pinLayer"></div>
+      </div>
+    </div>
+    <div class="deck-picked" id="deckPicked"></div>
+  </section>
+
+  <!-- 6. 돈 정산 -->
+  <section class="card">
+    <h2><span class="ico">💰</span> 비용 정산</h2>
+    <p class="hint">함께 간 사람을 넣고, 쓴 돈을 항목별로 적어요. 항목마다 누가 냈는지, 누구끼리 나눠 낼지 고르면 한 사람당 낼 돈을 계산해 드려요.</p>
+
+    <label class="fld" for="memberInput">함께 간 사람</label>
+    <div class="add-row">
+      <input id="memberInput" placeholder="이름 입력 (예: 나, 철수, 영희)" />
+      <button class="btn btn-main" id="memberAdd">추가</button>
+    </div>
+    <div class="split-members" id="memberList"></div>
+
+    <div id="expenseWrap"></div>
+    <div class="btn-row">
+      <button class="btn btn-ember" id="expenseAdd">지출 항목 추가</button>
+    </div>
+    <div class="file-import">
+      <label class="imp-btn" for="expFile">엑셀·CSV 올리기</label>
+      <input id="expFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
+      <span class="imp-help">엑셀 <b>첫 칸 항목 · 둘째 칸 금액 · 셋째 칸 낸 사람</b>. 예) 캠핑장 예약비, 90000, 나 — 처음엔 모두 함께 나누는 걸로 들어가요.</span>
+    </div>
+
+    <div class="settle-box" id="settleBox">
+      <h3>💸 정산 결과</h3>
+      <div id="settleContent"><div class="settle-empty">사람과 지출을 넣으면 여기에 정산 결과가 나와요.</div></div>
+    </div>
+  </section>
+
+  <!-- 7. 이 캠핑 저장 -->
+  <section class="card">
+    <h2><span class="ico">📌</span> 이 캠핑 저장하기</h2>
+    <p class="hint">날짜와 함께 저장하면 아래 목록에 남아요. 앱을 껐다 켜도 그대로 있어요.</p>
+    <div class="two">
+      <div>
+        <label class="fld" for="tripDate">캠핑 날짜</label>
+        <input id="tripDate" type="date" />
+      </div>
+      <div>
+        <label class="fld" for="tripWith">누구랑 / 메모</label>
+        <input id="tripWith" placeholder="예) 가족과 1박 2일" />
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-main" id="tripSave">현재 내용 저장</button>
+    </div>
+    <div id="tripList"></div>
+    <div class="save-note">모든 내용은 이 기기 안에만 저장돼요. 다른 사람은 볼 수 없어요.</div>
+  </section>
+
+  <footer class="foot">CampLog · 지도는 OpenStreetMap, 날씨는 Open-Meteo 무료 서비스를 사용합니다</footer>
+</div>
+
+<script>
+/* ================= 저장 도우미 ================= */
+const store = {
+  get(k, def){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ---- 엑셀·CSV 파일을 표(행 배열)로 읽기 ---- */
+function readSheet(file, onDone){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, blankrows:false, defval:''});
+      onDone(rows);       // rows = [[칸1,칸2,...], ...]
+    }catch(err){
+      alert('파일을 읽지 못했어요. 엑셀(.xlsx)이나 CSV 파일인지 확인해 주세요.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+/* 머리글 줄(예: "준비물","이름")로 보이면 건너뛰기 위한 판단 */
+function looksLikeHeader(cell){
+  const s = String(cell||'').trim();
+  return ['준비물','이름','물건','항목','살것','살 것','품목','내용','name','item'].includes(s);
+}
+
+/* ================= 지도 ================= */
+let map, marker;
+let currentPlace = { name:"", lat:37.5665, lon:126.9780 }; // 기본: 서울
+
+function initMap(){
+  map = L.map('map').setView([currentPlace.lat, currentPlace.lon], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19, attribution:'© OpenStreetMap'
+  }).addTo(map);
+  marker = L.marker([currentPlace.lat, currentPlace.lon]).addTo(map);
+}
+function setMap(lat, lon, name, zoom){
+  currentPlace = { name:name||currentPlace.name, lat, lon };
+  map.setView([lat, lon], zoom||12);
+  marker.setLatLng([lat, lon]);
+  if(name){
+    marker.bindPopup(name).openPopup();
+    document.getElementById('placeName').innerHTML = '표시된 곳: <b>'+name+'</b>';
+  }
+  store.set('camp_place', currentPlace);
+}
+
+/* 장소 검색 (무료 Nominatim) */
+async function findPlace(){
+  const q = document.getElementById('placeInput').value.trim();
+  if(!q){ alert('캠핑장 이름이나 지역을 먼저 적어 주세요.'); return; }
+  const nameEl = document.getElementById('placeName');
+  nameEl.textContent = '찾는 중…';
+  try{
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ko&q='+encodeURIComponent(q);
+    const r = await fetch(url, { headers:{'Accept':'application/json'} });
+    const data = await r.json();
+    if(data && data.length){
+      const p = data[0];
+      setMap(parseFloat(p.lat), parseFloat(p.lon), p.display_name.split(',')[0]+' — '+q, 13);
+    }else{
+      nameEl.textContent = '그 이름으로는 못 찾았어요. 지역명을 조금 더 넓게 적어 보세요. (예: 가평 캠핑장)';
+    }
+  }catch(e){
+    nameEl.textContent = '인터넷 연결을 확인해 주세요.';
+  }
+}
+
+/* 내 위치 */
+function myLocation(){
+  if(!navigator.geolocation){ alert('이 기기에서는 위치를 쓸 수 없어요.'); return; }
+  document.getElementById('placeName').textContent = '내 위치 확인 중… (허용 창이 뜨면 "허용"을 눌러 주세요)';
+  navigator.geolocation.getCurrentPosition(
+    pos => setMap(pos.coords.latitude, pos.coords.longitude, '내 위치', 13),
+    err => { document.getElementById('placeName').textContent = '위치 허용이 안 됐어요. 캠핑장 이름으로 찾아 주세요.'; }
+  );
+}
+
+/* ================= 날씨 (Open-Meteo, 무료·키 불필요) ================= */
+const wxEmoji = code => {
+  if(code===0) return ['☀️','맑음'];
+  if([1,2].includes(code)) return ['🌤️','대체로 맑음'];
+  if(code===3) return ['☁️','흐림'];
+  if([45,48].includes(code)) return ['🌫️','안개'];
+  if([51,53,55,56,57].includes(code)) return ['🌦️','이슬비'];
+  if([61,63,65,66,67,80,81,82].includes(code)) return ['🌧️','비'];
+  if([71,73,75,77,85,86].includes(code)) return ['🌨️','눈'];
+  if([95,96,99].includes(code)) return ['⛈️','천둥번개'];
+  return ['🌡️','—'];
+};
+async function loadWeather(){
+  const grid = document.getElementById('wxGrid');
+  const note = document.getElementById('wxNote');
+  grid.innerHTML = '<div style="color:#8ba888;padding:8px">날씨를 불러오는 중…</div>';
+  note.style.display='none';
+  try{
+    const {lat, lon, name} = currentPlace;
+    const url = 'https://api.open-meteo.com/v1/forecast'
+      +'?latitude='+lat+'&longitude='+lon
+      +'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+      +'&timezone=auto&forecast_days=7';
+    const r = await fetch(url);
+    const d = await r.json();
+    const days = d.daily.time;
+    const dow = ['일','월','화','수','목','금','토'];
+    let html='', rainWarn=false;
+    for(let i=0;i<days.length;i++){
+      const dt = new Date(days[i]);
+      const label = (i===0)?'오늘':(dt.getMonth()+1)+'/'+dt.getDate()+'('+dow[dt.getDay()]+')';
+      const [emo] = wxEmoji(d.daily.weather_code[i]);
+      const hi = Math.round(d.daily.temperature_2m_max[i]);
+      const lo = Math.round(d.daily.temperature_2m_min[i]);
+      const rain = d.daily.precipitation_probability_max[i];
+      if(i<=2 && rain>=50) rainWarn=true;
+      html += '<div class="wx-day"><div class="d">'+label+'</div>'
+        +'<div class="emo">'+emo+'</div>'
+        +'<div class="t"><span class="hi">'+hi+'°</span> / <span class="lo">'+lo+'°</span></div>'
+        +'<div class="rain">☔ '+(rain==null?'-':rain+'%')+'</div></div>';
+    }
+    grid.innerHTML = html;
+    let msg = (name?('📍 '+name.split(' — ')[0]+' 기준 날씨예요. '):'');
+    if(rainWarn) msg += '곧 비 소식이 있어요. 타프와 우비, 여벌 옷을 꼭 챙기세요! 🌧️';
+    else msg += '큰 비 소식은 없어요. 그래도 일교차가 크니 따뜻한 옷 한 벌은 챙기세요. 🧥';
+    note.textContent = msg; note.style.display='block';
+  }catch(e){
+    grid.innerHTML='<div style="color:#c96f3f;padding:8px">날씨를 못 불러왔어요. 인터넷 연결을 확인하고 다시 눌러 주세요.</div>';
+  }
+}
+
+/* ================= 준비물 체크리스트 ================= */
+const defaultChecklist = [
+  {cat:'잠자리', items:['텐트','타프','그라운드시트','폴대·팩','고무망치','침낭','매트','베개']},
+  {cat:'주방', items:['버너','부탄가스','코펠·냄비','수저·젓가락','접시·컵','칼·도마','집게','식용유·양념','물통','아이스박스','수세미·세제','키친타월']},
+  {cat:'불·조명', items:['화로대','장작·숯','토치·라이터','랜턴','손전등','여분 건전지']},
+  {cat:'생활', items:['캠핑의자','테이블','돗자리','물티슈','휴지','수건','비상약','벌레퇴치제','쓰레기봉투','충전기·보조배터리']},
+  {cat:'옷', items:['여벌 옷','따뜻한 겉옷','양말','모자','우비','슬리퍼']},
+];
+let checklistData = store.get('camp_checklist', null);
+let activeCat = '전체';
+
+if(!checklistData){
+  checklistData = [];
+  defaultChecklist.forEach(g => g.items.forEach(it => checklistData.push({cat:g.cat, txt:it, done:false})));
+  store.set('camp_checklist', checklistData);
+}
+function saveChecklist(){ store.set('camp_checklist', checklistData); }
+
+function renderCats(){
+  const cats = ['전체', ...new Set(checklistData.map(i=>i.cat))];
+  const box = document.getElementById('chkCats');
+  box.innerHTML = cats.map(c =>
+    '<button class="chk-cat'+(c===activeCat?' on':'')+'" data-c="'+c+'">'+c+'</button>'
+  ).join('');
+  box.querySelectorAll('.chk-cat').forEach(b=>{
+    b.onclick=()=>{ activeCat=b.dataset.c; renderCats(); renderChecklist(); };
+  });
+}
+function renderChecklist(){
+  const ul = document.getElementById('checklist');
+  const list = checklistData.filter(i=>activeCat==='전체'||i.cat===activeCat);
+  ul.innerHTML = list.map((i)=>{
+    const idx = checklistData.indexOf(i);
+    return '<li class="'+(i.done?'done':'')+'">'
+      +'<input type="checkbox" data-i="'+idx+'" '+(i.done?'checked':'')+'>'
+      +'<span class="txt">'+i.txt+'<span style="color:#b6ab90;font-size:12px"> · '+i.cat+'</span></span>'
+      +'<button class="del" data-d="'+idx+'">×</button></li>';
+  }).join('') || '<li class="empty" style="justify-content:center">이 칸에는 준비물이 없어요.</li>';
+  ul.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.onchange=()=>{ checklistData[cb.dataset.i].done=cb.checked; saveChecklist(); renderChecklist(); updateProgress(); };
+  });
+  ul.querySelectorAll('.del').forEach(b=>{
+    b.onclick=()=>{ checklistData.splice(b.dataset.d,1); saveChecklist(); renderCats(); renderChecklist(); updateProgress(); };
+  });
+  updateProgress();
+}
+function updateProgress(){
+  const total = checklistData.length;
+  const done = checklistData.filter(i=>i.done).length;
+  const pct = total? Math.round(done/total*100):0;
+  document.getElementById('progBar').style.width = pct+'%';
+  document.getElementById('progLabel').textContent = total+'개 중 '+done+'개 챙김 ('+pct+'%)';
+}
+document.getElementById('chkAdd').onclick=()=>{
+  const inp=document.getElementById('chkInput'); const v=inp.value.trim();
+  if(!v) return;
+  const cat = (activeCat==='전체')?'기타':activeCat;
+  checklistData.push({cat, txt:v, done:false});
+  saveChecklist(); inp.value=''; renderCats(); renderChecklist();
+};
+document.getElementById('chkInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('chkAdd').click(); });
+document.getElementById('chkFile').addEventListener('change', function(){
+  const file=this.files[0]; if(!file) return;
+  readSheet(file, rows=>{
+    let added=0;
+    rows.forEach((r,idx)=>{
+      const name=String(r[0]||'').trim();
+      if(!name) return;
+      if(idx===0 && looksLikeHeader(name)) return;
+      const cat=String(r[1]||'').trim()||'기타';
+      checklistData.push({cat, txt:name, done:false});
+      added++;
+    });
+    saveChecklist(); renderCats(); renderChecklist();
+    alert(added+'개의 준비물을 목록에 넣었어요.');
+  });
+  this.value='';
+});
+
+/* ================= 장보기 ================= */
+let shopData = store.get('camp_shop', []);
+function saveShop(){ store.set('camp_shop', shopData); }
+function renderShop(){
+  const ul=document.getElementById('shopList');
+  ul.innerHTML = shopData.map((s,i)=>
+    '<li class="'+(s.got?'got':'')+'">'
+    +'<input type="checkbox" data-i="'+i+'" '+(s.got?'checked':'')+'>'
+    +'<span>'+s.txt+'</span>'
+    +'<button class="del" data-d="'+i+'">×</button></li>'
+  ).join('') || '<li class="empty" style="justify-content:center">아직 적은 게 없어요. 살 것을 추가해 보세요.</li>';
+  ul.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.onchange=()=>{ shopData[cb.dataset.i].got=cb.checked; saveShop(); renderShop(); };
+  });
+  ul.querySelectorAll('.del').forEach(b=>{
+    b.onclick=()=>{ shopData.splice(b.dataset.d,1); saveShop(); renderShop(); };
+  });
+}
+document.getElementById('shopAdd').onclick=()=>{
+  const inp=document.getElementById('shopInput'); const v=inp.value.trim();
+  if(!v) return; shopData.push({txt:v, got:false}); saveShop(); inp.value=''; renderShop();
+};
+document.getElementById('shopInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('shopAdd').click(); });
+document.getElementById('shopFile').addEventListener('change', function(){
+  const file=this.files[0]; if(!file) return;
+  readSheet(file, rows=>{
+    let added=0;
+    rows.forEach((r,idx)=>{
+      const txt=String(r[0]||'').trim();
+      if(!txt) return;
+      if(idx===0 && looksLikeHeader(txt)) return;
+      shopData.push({txt, got:false});
+      added++;
+    });
+    saveShop(); renderShop();
+    alert(added+'개의 살 것을 목록에 넣었어요.');
+  });
+  this.value='';
+});
+
+/* ================= 데크 배치도 (사진 + 핀) ================= */
+/* deckImg: 사진 데이터(문자열), pins: [{x,y}] — x,y는 사진 안에서의 비율(0~1) */
+let deckImg = store.get('camp_deck_img', null);
+let pins = store.get('camp_deck_pins', []);
+
+function saveDeck(){ store.set('camp_deck_img', deckImg); store.set('camp_deck_pins', pins); }
+
+function showDeck(){
+  const empty = document.getElementById('deckEmpty');
+  const canvas = document.getElementById('deckCanvas');
+  const imgEl = document.getElementById('deckImg');
+  if(deckImg){
+    imgEl.src = deckImg;
+    empty.style.display='none';
+    canvas.style.display='block';
+  }else{
+    empty.style.display='block';
+    canvas.style.display='none';
+  }
+  renderPins();
+  renderDeckPicked();
+}
+
+function renderPins(){
+  const layer = document.getElementById('pinLayer');
+  layer.innerHTML = pins.map((p,i)=>
+    '<div class="pin" data-i="'+i+'" style="left:'+(p.x*100)+'%;top:'+(p.y*100)+'%">'
+    +'<span class="cap">'+(i+1)+'</span>⛺</div>'
+  ).join('');
+  layer.querySelectorAll('.pin').forEach(pin=>{
+    pin.onclick=(e)=>{
+      e.stopPropagation();
+      if(confirm((parseInt(pin.dataset.i)+1)+'번 핀을 지울까요?')){
+        pins.splice(pin.dataset.i,1); saveDeck(); renderPins(); renderDeckPicked();
+      }
+    };
+  });
+}
+function renderDeckPicked(){
+  const el = document.getElementById('deckPicked');
+  if(deckImg && pins.length){
+    el.classList.add('show');
+    el.innerHTML = '찍은 자리: <b>'+pins.length+'곳</b> ⛺ · 핀을 누르면 지울 수 있어요.';
+  }else if(deckImg){
+    el.classList.add('show');
+    el.innerHTML = '사진 위에서 예약한 자리를 눌러 핀을 찍어 주세요.';
+  }else{
+    el.classList.remove('show');
+    el.innerHTML='';
+  }
+}
+
+/* 사진 올리기 */
+document.getElementById('deckImgInput').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    deckImg = e.target.result;
+    pins = [];           // 새 사진이면 핀 초기화
+    saveDeck(); showDeck();
+  };
+  reader.readAsDataURL(file);
+  this.value='';
+});
+
+/* 사진 눌러 핀 찍기 */
+document.getElementById('deckImg').addEventListener('click', function(e){
+  const rect = this.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  pins.push({x, y});
+  saveDeck(); renderPins(); renderDeckPicked();
+});
+
+/* 마지막 핀 / 전부 지우기 */
+document.getElementById('deckUndo').onclick=()=>{
+  if(!pins.length){ return; }
+  pins.pop(); saveDeck(); renderPins(); renderDeckPicked();
+};
+document.getElementById('deckClearAll').onclick=()=>{
+  if(pins.length && confirm('핀을 전부 지울까요? (사진은 그대로 남아요)')){
+    pins=[]; saveDeck(); renderPins(); renderDeckPicked();
+  }
+};
+
+/* ================= 비용 정산 ================= */
+let members = store.get('camp_members', []);      // ['나','철수']
+let expenses = store.get('camp_expenses', []);    // [{id,title,amount,payer,sharers:[]}]
+
+function saveSplit(){ store.set('camp_members', members); store.set('camp_expenses', expenses); }
+const won = n => (Math.round(n)).toLocaleString('ko-KR')+'원';
+
+/* --- 사람 --- */
+function renderMembers(){
+  const box = document.getElementById('memberList');
+  box.innerHTML = members.length
+    ? members.map((m,i)=>'<span class="member-chip">'+m+'<button data-m="'+i+'">×</button></span>').join('')
+    : '<span style="color:#9c9684;font-size:13.5px">아직 사람이 없어요. 이름을 추가해 주세요.</span>';
+  box.querySelectorAll('button[data-m]').forEach(b=>{
+    b.onclick=()=>{
+      const name = members[b.dataset.m];
+      members.splice(b.dataset.m,1);
+      // 지출에서도 그 사람 빼기
+      expenses.forEach(e=>{
+        if(e.payer===name) e.payer = members[0]||'';
+        e.sharers = e.sharers.filter(s=>s!==name);
+      });
+      saveSplit(); renderMembers(); renderExpenses(); renderSettle();
+    };
+  });
+}
+document.getElementById('memberAdd').onclick=()=>{
+  const inp=document.getElementById('memberInput'); const v=inp.value.trim();
+  if(!v) return;
+  if(members.includes(v)){ alert('이미 있는 이름이에요.'); return; }
+  members.push(v); saveSplit(); inp.value=''; renderMembers(); renderExpenses(); renderSettle();
+};
+document.getElementById('memberInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('memberAdd').click(); });
+
+/* --- 지출 항목 --- */
+function renderExpenses(){
+  const wrap = document.getElementById('expenseWrap');
+  if(!expenses.length){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = expenses.map(e=>{
+    const payerOpts = members.map(m=>'<option value="'+m+'"'+(m===e.payer?' selected':'')+'>'+m+'</option>').join('');
+    const picks = members.map(m=>
+      '<span class="share-pick'+(e.sharers.includes(m)?' on':'')+'" data-e="'+e.id+'" data-name="'+m+'">'+m+'</span>'
+    ).join('');
+    return '<div class="expense">'
+      +'<div class="er1">'
+        +'<div><label class="fld" style="margin-top:0">무엇에</label>'
+          +'<input data-ex-title="'+e.id+'" value="'+(e.title||'').replace(/"/g,'&quot;')+'" placeholder="예) 캠핑장 예약비"></div>'
+        +'<div><label class="fld" style="margin-top:0">얼마</label>'
+          +'<input data-ex-amt="'+e.id+'" type="number" inputmode="numeric" value="'+(e.amount||'')+'" placeholder="0"></div>'
+        +'<div><label class="fld" style="margin-top:0">누가 냄</label>'
+          +'<select data-ex-payer="'+e.id+'">'+(payerOpts||'<option>사람 먼저 추가</option>')+'</select></div>'
+        +'<button class="del-exp" data-ex-del="'+e.id+'">×</button>'
+      +'</div>'
+      +'<div class="sharers"><div class="lbl2">누구끼리 나눠 낼까요? (탭해서 켜고 끄기)</div>'
+        +'<div class="share-picks">'+(picks||'<span style="color:#9c9684;font-size:13px">사람을 먼저 추가하세요</span>')+'</div></div>'
+    +'</div>';
+  }).join('');
+
+  wrap.querySelectorAll('[data-ex-title]').forEach(inp=>{
+    inp.oninput=()=>{ expenses.find(x=>x.id==inp.dataset.exTitle).title=inp.value; saveSplit(); };
+  });
+  wrap.querySelectorAll('[data-ex-amt]').forEach(inp=>{
+    inp.oninput=()=>{ expenses.find(x=>x.id==inp.dataset.exAmt).amount=parseFloat(inp.value)||0; saveSplit(); renderSettle(); };
+  });
+  wrap.querySelectorAll('[data-ex-payer]').forEach(sel=>{
+    sel.onchange=()=>{ expenses.find(x=>x.id==sel.dataset.exPayer).payer=sel.value; saveSplit(); renderSettle(); };
+  });
+  wrap.querySelectorAll('[data-ex-del]').forEach(b=>{
+    b.onclick=()=>{ expenses=expenses.filter(x=>x.id!=b.dataset.exDel); saveSplit(); renderExpenses(); renderSettle(); };
+  });
+  wrap.querySelectorAll('.share-pick').forEach(p=>{
+    p.onclick=()=>{
+      const e = expenses.find(x=>x.id==p.dataset.e);
+      const name = p.dataset.name;
+      if(e.sharers.includes(name)) e.sharers = e.sharers.filter(s=>s!==name);
+      else e.sharers.push(name);
+      saveSplit(); renderExpenses(); renderSettle();
+    };
+  });
+}
+document.getElementById('expenseAdd').onclick=()=>{
+  if(!members.length){ alert('함께 간 사람을 먼저 추가해 주세요.'); return; }
+  expenses.push({ id:Date.now(), title:'', amount:0, payer:members[0], sharers:[...members] });
+  saveSplit(); renderExpenses(); renderSettle();
+};
+document.getElementById('expFile').addEventListener('change', function(){
+  const file=this.files[0]; if(!file) return;
+  readSheet(file, rows=>{
+    let added=0, baseId=Date.now();
+    rows.forEach((r,idx)=>{
+      const title=String(r[0]||'').trim();
+      const amount=parseFloat(String(r[1]||'').replace(/[^0-9.]/g,''))||0;
+      let payer=String(r[2]||'').trim();
+      if(!title && !amount) return;
+      if(idx===0 && (looksLikeHeader(title)||['금액','비용','가격'].includes(String(r[1]||'').trim()))) return;
+      // 낸 사람이 명단에 없으면 새로 추가
+      if(payer && !members.includes(payer)) members.push(payer);
+      if(!payer) payer = members[0]||'';
+      expenses.push({ id:baseId+idx, title, amount, payer, sharers:[...members] });
+      added++;
+    });
+    // 기존 항목들의 '나눌 사람'에 새로 생긴 사람도 반영되도록 그대로 두고 다시 그림
+    saveSplit(); renderMembers(); renderExpenses(); renderSettle();
+    alert(added+'개의 지출을 넣었어요. 항목마다 나눌 사람은 필요하면 바꿔 주세요.');
+  });
+  this.value='';
+});
+
+/* --- 정산 계산 --- */
+function renderSettle(){
+  const box = document.getElementById('settleContent');
+  const valid = expenses.filter(e=>e.amount>0 && e.sharers.length>0 && e.payer);
+  if(!members.length || !valid.length){
+    box.innerHTML='<div class="settle-empty">사람과 지출(금액·나눌 사람)을 넣으면 여기에 정산 결과가 나와요.</div>';
+    return;
+  }
+  // 각 사람이 낸 돈 / 내야 할 돈
+  const paid = {}, owe = {};
+  members.forEach(m=>{ paid[m]=0; owe[m]=0; });
+  let total = 0;
+  valid.forEach(e=>{
+    total += e.amount;
+    paid[e.payer] = (paid[e.payer]||0) + e.amount;
+    const per = e.amount / e.sharers.length;
+    e.sharers.forEach(s=>{ owe[s] = (owe[s]||0) + per; });
+  });
+  // 잔액 = 낸 돈 - 내야 할 돈 (양수면 받을 돈, 음수면 줄 돈)
+  const bal = {};
+  members.forEach(m=>{ bal[m] = paid[m] - owe[m]; });
+
+  let rows = members.map(m=>{
+    const b = Math.round(bal[m]);
+    let cls='', txt='';
+    if(b>0){ cls='plus'; txt='+'+won(b)+' 받을 돈'; }
+    else if(b<0){ cls='minus'; txt=won(-b)+' 낼 돈'; }
+    else { txt='정산 끝 (0원)'; }
+    return '<div class="settle-row"><span class="who">'+m+'</span><span class="amt '+cls+'">'+txt+'</span></div>';
+  }).join('');
+
+  // 누가 누구에게 보내면 되는지 (최소 송금 계산)
+  const creditors = members.map(m=>({name:m, amt:Math.round(bal[m])})).filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt);
+  const debtors  = members.map(m=>({name:m, amt:-Math.round(bal[m])})).filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt);
+  let transfers='';
+  let ci=0, di=0;
+  const cr = creditors.map(c=>({...c})), db = debtors.map(d=>({...d}));
+  while(ci<cr.length && di<db.length){
+    const give = Math.min(cr[ci].amt, db[di].amt);
+    transfers += '<div class="transfer-line"><b>'+db[di].name+'</b><span class="arrow">→</span><b>'+cr[ci].name+'</b> 에게 '+won(give)+' 보내기</div>';
+    cr[ci].amt -= give; db[di].amt -= give;
+    if(cr[ci].amt===0) ci++;
+    if(db[di].amt===0) di++;
+  }
+  if(!transfers) transfers = '<div class="transfer-line">서로 주고받을 돈이 없어요. 딱 맞아요! 👍</div>';
+
+  box.innerHTML =
+    '<div class="settle-total">전체 지출 <b>'+won(total)+'</b> · 사람 '+members.length+'명</div>'
+    + rows
+    + '<div class="transfers"><div class="lbl2" style="font-size:13px;color:var(--moss);margin-bottom:2px">💌 이렇게 보내면 정산 끝!</div>'
+    + transfers + '</div>';
+}
+
+/* ================= 캠핑 저장 ================= */
+let trips = store.get('camp_trips', []);
+// 옛 기록에 id가 없으면 붙여 준다 (날짜순 정렬·불러오기 안전용)
+let _needSave=false;
+trips.forEach((t,i)=>{ if(t.id==null){ t.id = Date.now()+i; _needSave=true; } });
+function saveTrips(){ store.set('camp_trips', trips); }
+if(_needSave) saveTrips();
+function renderTrips(){
+  const box=document.getElementById('tripList');
+  if(!trips.length){ box.innerHTML='<div class="empty">아직 저장한 캠핑이 없어요.</div>'; return; }
+
+  // 오늘 날짜 (시간 제외)
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dow = ['일','월','화','수','목','금','토'];
+
+  // 예정(오늘 이후) / 다녀옴(과거) / 날짜없음 으로 분류
+  const upcoming = [], past = [], undated = [];
+  trips.forEach(t=>{
+    if(!t.date){ undated.push(t); return; }
+    const d = new Date(t.date); d.setHours(0,0,0,0);
+    if(d >= today) upcoming.push(t); else past.push(t);
+  });
+  // 예정: 가까운 날짜부터 / 다녀옴: 최근에 다녀온 것부터
+  upcoming.sort((a,b)=> new Date(a.date) - new Date(b.date));
+  past.sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+  function fmt(t){
+    if(!t.date) return '날짜 미정';
+    const d = new Date(t.date);
+    const dday = Math.round((new Date(t.date).setHours(0,0,0,0) - today)/86400000);
+    let tag = '';
+    if(dday>0) tag = ' · D-'+dday;
+    else if(dday===0) tag = ' · 오늘!';
+    return (d.getFullYear())+'.'+(d.getMonth()+1)+'.'+d.getDate()+'('+dow[d.getDay()]+')'+tag;
+  }
+  function card(t){
+    const done = t.checklist.filter(x=>x.done).length;
+    let spent = 0;
+    if(t.expenses) t.expenses.forEach(e=>{ if(e.amount>0) spent += e.amount; });
+    const spentTxt = spent>0 ? (' · 💰 '+Math.round(spent).toLocaleString('ko-KR')+'원') : '';
+    return '<div class="trip"><div class="th"><b>'+(t.place||'캠핑')+'</b><span class="when">'+fmt(t)+'</span></div>'
+      +'<div class="meta">'+(t.with||'')+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
+      +'<div class="tbtns"><button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>'
+      +'<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>'
+      +'<button class="btn btn-ghost" data-del="'+t.id+'">삭제</button></div></div>';
+  }
+
+  let html='';
+  if(upcoming.length){
+    html += '<div class="trip-group"><div class="group-title">🎒 가기로 한 캠핑 <small>'+upcoming.length+'곳</small></div>'
+      + upcoming.map(card).join('') + '</div>';
+  }
+  if(past.length){
+    html += '<div class="trip-group"><div class="group-title">✅ 다녀온 캠핑 <small>'+past.length+'곳</small></div>'
+      + past.map(card).join('') + '</div>';
+  }
+  if(undated.length){
+    html += '<div class="trip-group"><div class="group-title">📎 날짜 미정 <small>'+undated.length+'곳</small></div>'
+      + undated.map(card).join('') + '</div>';
+  }
+  box.innerHTML = html;
+
+  function applyTrip(t, asCopy){
+    checklistData = JSON.parse(JSON.stringify(t.checklist)); saveChecklist();
+    shopData = JSON.parse(JSON.stringify(t.shop)); saveShop();
+    myDeck = null;
+    deckImg = t.deckImg || null;
+    pins = t.deckPins ? JSON.parse(JSON.stringify(t.deckPins)) : [];
+    saveDeck();
+    members = t.members ? JSON.parse(JSON.stringify(t.members)) : [];
+    // 복사할 때는 지난 금액은 비우고, 항목·사람·나눔방식만 가져온다
+    expenses = t.expenses ? JSON.parse(JSON.stringify(t.expenses)) : [];
+    if(asCopy){ expenses.forEach(e=>{ e.amount=0; }); }
+    saveSplit();
+    if(t.lat){ setMap(t.lat,t.lon,t.place, asCopy?11:12); }
+    document.getElementById('placeInput').value = asCopy ? '' : (document.getElementById('placeInput').value);
+    document.getElementById('tripDate').value = asCopy ? '' : (t.date||'');
+    document.getElementById('tripWith').value = asCopy ? '' : (t.with||'');
+    renderCats(); renderChecklist(); renderShop();
+    showDeck();
+    renderMembers(); renderExpenses(); renderSettle();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  box.querySelectorAll('[data-load]').forEach(b=>{
+    b.onclick=()=>{
+      const t=trips.find(x=>x.id==b.dataset.load);
+      if(!t) return;
+      applyTrip(t, false);
+      alert('불러왔어요! 위 지도·준비물·장보기가 이 캠핑 내용으로 바뀌었어요.');
+    };
+  });
+  box.querySelectorAll('[data-copy]').forEach(b=>{
+    b.onclick=()=>{
+      const t=trips.find(x=>x.id==b.dataset.copy);
+      if(!t) return;
+      applyTrip(t, true);
+      alert('이 캠핑을 바탕으로 복사했어요!\n\n준비물·장보기·사람·정산 항목은 그대로 가져오고, 날짜·장소·금액은 비워 뒀어요.\n새 캠핑장과 날짜를 넣고 아래 ‘현재 내용 저장’을 누르면 새 기록으로 저장돼요. (원래 기록은 그대로 남아요)');
+    };
+  });
+  box.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick=()=>{ if(confirm('이 캠핑 기록을 지울까요?')){ trips = trips.filter(x=>x.id!=b.dataset.del); saveTrips(); renderTrips(); } };
+  });
+}
+document.getElementById('tripSave').onclick=()=>{
+  trips.unshift({
+    id: Date.now(),
+    place: currentPlace.name || document.getElementById('placeInput').value.trim() || '캠핑',
+    lat: currentPlace.lat, lon: currentPlace.lon,
+    date: document.getElementById('tripDate').value,
+    with: document.getElementById('tripWith').value.trim(),
+    deckImg: deckImg,
+    deckPins: JSON.parse(JSON.stringify(pins)),
+    members: JSON.parse(JSON.stringify(members)),
+    expenses: JSON.parse(JSON.stringify(expenses)),
+    checklist: JSON.parse(JSON.stringify(checklistData)),
+    shop: JSON.parse(JSON.stringify(shopData))
+  });
+  saveTrips(); renderTrips();
+  alert('저장했어요! 아래 목록에 날짜순으로 정리돼요.');
+};
+
+/* ================= 시작 ================= */
+document.getElementById('findBtn').onclick=findPlace;
+document.getElementById('myLocBtn').onclick=myLocation;
+document.getElementById('wxBtn').onclick=loadWeather;
+document.getElementById('placeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') findPlace(); });
+
+const savedPlace = store.get('camp_place', null);
+if(savedPlace){ currentPlace = savedPlace; }
+initMap();
+if(savedPlace && savedPlace.name){
+  document.getElementById('placeName').innerHTML='표시된 곳: <b>'+savedPlace.name+'</b>';
+  marker.bindPopup(savedPlace.name);
+}
+renderCats(); renderChecklist(); renderShop(); renderTrips();
+showDeck();
+renderMembers(); renderExpenses(); renderSettle();
+</script>
+</body>
+</html>
