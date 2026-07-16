@@ -217,7 +217,7 @@
     border:1px solid var(--line);border-radius:14px;overflow:hidden;
     background:#fffdf7;line-height:0;
   }
-  .deck-canvas img{width:100%;display:block;cursor:crosshair}
+  .deck-canvas img{width:100%;display:block;cursor:crosshair;touch-action:manipulation;-webkit-user-select:none;user-select:none}
   .pin-layer{position:absolute;inset:0;line-height:normal}
   .pin{
     position:absolute;transform:translate(-50%,-100%);
@@ -409,15 +409,14 @@
     </div>
   </header>
 
-  <!-- 1. 캠핑장 찾기 & 지도 -->
+  <!-- 1. 캠핑장 위치 -->
   <section class="card">
-    <h2><span class="ico">🏕️</span> 캠핑장 찾기</h2>
-    <p class="hint">가고 싶은 캠핑장 이름이나 지역을 적고 ‘지도에서 찾기’를 누르면, 아래 지도에 위치가 표시돼요.</p>
+    <h2><span class="ico">🏕️</span> 캠핑장 위치</h2>
+    <p class="hint">캠핑장 이름이나 지역을 적고 ‘위치 표시’를 누르면, 아래 지도에 그 자리가 핀으로 표시돼요.</p>
     <label class="fld" for="placeInput">캠핑장 이름 또는 지역</label>
     <input id="placeInput" placeholder="예) 가평 자라섬 오토캠핑장" />
     <div class="btn-row">
-      <button class="btn btn-main" id="findBtn">지도에서 찾기</button>
-      <button class="btn btn-ghost" id="myLocBtn">내 위치로</button>
+      <button class="btn btn-main" id="findBtn">위치 표시</button>
     </div>
     <div class="place-name" id="placeName"></div>
     <div id="map"></div>
@@ -426,7 +425,7 @@
   <!-- 2. 날씨 -->
   <section class="card">
     <h2><span class="ico">⛅</span> 캠핑장 날씨</h2>
-    <p class="hint">위에서 캠핑장을 찾으면 그곳의 날씨를, 아직 안 찾았으면 ‘내 위치로’ 눌러 지금 있는 곳 날씨를 볼 수 있어요.</p>
+    <p class="hint">위에서 캠핑장 위치를 표시하면, 그곳의 7일 날씨를 볼 수 있어요.</p>
     <div class="btn-row">
       <button class="btn btn-ember" id="wxBtn">날씨 불러오기</button>
     </div>
@@ -615,16 +614,6 @@ async function findPlace(){
   }catch(e){
     nameEl.textContent = '인터넷 연결을 확인해 주세요.';
   }
-}
-
-/* 내 위치 */
-function myLocation(){
-  if(!navigator.geolocation){ alert('이 기기에서는 위치를 쓸 수 없어요.'); return; }
-  document.getElementById('placeName').textContent = '내 위치 확인 중… (허용 창이 뜨면 "허용"을 눌러 주세요)';
-  navigator.geolocation.getCurrentPosition(
-    pos => setMap(pos.coords.latitude, pos.coords.longitude, '내 위치', 13),
-    err => { document.getElementById('placeName').textContent = '위치 허용이 안 됐어요. 캠핑장 이름으로 찾아 주세요.'; }
-  );
 }
 
 /* ================= 날씨 (Open-Meteo, 무료·키 불필요) ================= */
@@ -863,14 +852,47 @@ document.getElementById('deckImgInput').addEventListener('change', function(){
   this.value='';
 });
 
-/* 사진 눌러 핀 찍기 */
-document.getElementById('deckImg').addEventListener('click', function(e){
-  const rect = this.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-  pins.push({x, y});
-  saveDeck(); renderPins(); renderDeckPicked();
-});
+/* 사진 눌러 핀 찍기 (마우스 클릭 + 아이패드/아이폰 터치 모두 지원) */
+(function(){
+  const img = document.getElementById('deckImg');
+  let touchStart = null;   // 손가락을 처음 댄 위치·시간
+
+  function addPinAt(clientX, clientY){
+    const rect = img.getBoundingClientRect();
+    let x = (clientX - rect.left) / rect.width;
+    let y = (clientY - rect.top) / rect.height;
+    // 사진 밖을 눌렀으면 무시
+    if(x<0||x>1||y<0||y>1) return;
+    pins.push({x, y});
+    saveDeck(); renderPins(); renderDeckPicked();
+  }
+
+  // 데스크톱 마우스
+  img.addEventListener('click', function(e){
+    // 터치로 이미 처리한 경우 중복 방지
+    if(e.__handledByTouch) return;
+    addPinAt(e.clientX, e.clientY);
+  });
+
+  // 아이패드/아이폰/안드로이드 터치
+  img.addEventListener('touchstart', function(e){
+    const t = e.changedTouches[0];
+    touchStart = { x:t.clientX, y:t.clientY, time:Date.now() };
+  }, {passive:true});
+
+  img.addEventListener('touchend', function(e){
+    if(!touchStart) return;
+    const t = e.changedTouches[0];
+    const moved = Math.abs(t.clientX-touchStart.x) + Math.abs(t.clientY-touchStart.y);
+    const elapsed = Date.now() - touchStart.time;
+    // 살짝 톡 눌렀을 때만 핀 찍기 (스크롤·확대 동작과 구분)
+    if(moved < 14 && elapsed < 600){
+      e.preventDefault();               // 뒤이어 오는 가짜 click 막기
+      addPinAt(t.clientX, t.clientY);
+    }
+    touchStart = null;
+  }, {passive:false});
+})();
 
 /* 마지막 핀 / 전부 지우기 */
 document.getElementById('deckUndo').onclick=()=>{
@@ -1168,7 +1190,6 @@ document.getElementById('tripSave').onclick=()=>{
 
 /* ================= 시작 ================= */
 document.getElementById('findBtn').onclick=findPlace;
-document.getElementById('myLocBtn').onclick=myLocation;
 document.getElementById('wxBtn').onclick=loadWeather;
 document.getElementById('placeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') findPlace(); });
 
