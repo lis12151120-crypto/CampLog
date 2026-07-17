@@ -4,9 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CampLog · 캠핑 준비 노트</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bark:#2f3e34;        /* 진한 숲 초록 */
@@ -117,6 +118,14 @@
   @media(max-width:560px){.two{grid-template-columns:1fr}}
 
   /* ---- 지도 ---- */
+  .ext-map-btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+  .ext-map{
+    text-decoration:none;font-size:14px;font-weight:600;
+    padding:11px 15px;border-radius:10px;display:inline-flex;align-items:center;gap:6px;
+  }
+  .ext-map.kakao{background:#fee500;color:#3c1e1e}
+  .ext-map.naver{background:#03c75a;color:#fff}
+  .ext-map:hover{filter:brightness(1.05)}
   #map{height:300px;border-radius:12px;border:1px solid var(--line);margin-top:6px;z-index:0}
   .place-name{margin-top:12px;font-size:15px;color:var(--bark)}
   .place-name b{color:var(--ember)}
@@ -148,6 +157,15 @@
   }
   .chk-cat.on{background:var(--bark);color:#fff;border-color:var(--bark)}
   ul.checklist{list-style:none;margin-top:4px}
+  ul.checklist li.chk-head{
+    display:flex;align-items:center;gap:6px;
+    background:#efe7d3;color:var(--bark);font-weight:700;font-size:14px;
+    padding:11px 12px;border-radius:8px;margin-top:8px;border-bottom:none;cursor:pointer;
+  }
+  ul.checklist li.chk-head .arw{font-size:11px;color:var(--moss)}
+  ul.checklist li.chk-head .cnt{margin-left:auto;font-size:12px;color:var(--moss);font-weight:600}
+  ul.checklist li.chk-head:first-child{margin-top:0}
+  ul.checklist li.chk-head span{font-size:12px;color:var(--moss);font-weight:600}
   ul.checklist li{
     display:flex;align-items:center;gap:11px;
     padding:10px 6px;border-bottom:1px solid var(--line);
@@ -217,8 +235,9 @@
     border:1px solid var(--line);border-radius:14px;overflow:hidden;
     background:#fffdf7;line-height:0;
   }
-  .deck-canvas img{width:100%;display:block;cursor:crosshair;touch-action:manipulation;-webkit-user-select:none;user-select:none}
-  .pin-layer{position:absolute;inset:0;line-height:normal}
+  .deck-canvas img{width:100%;display:block;-webkit-user-select:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+  /* 핀 층이 클릭을 받는다 (사진 대신). 여기서 눌러 핀을 꽂음 */
+  .pin-layer{position:absolute;inset:0;line-height:normal;cursor:crosshair;touch-action:manipulation}
   .pin{
     position:absolute;transform:translate(-50%,-100%);
     font-size:26px;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));
@@ -259,6 +278,22 @@
     border:1px solid var(--sage);background:transparent;color:var(--bark);
   }
   .share-pick.on{background:var(--moss);color:#fff;border-color:var(--moss)}
+  .album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:10px}
+  .album-grid .ac{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  .album-grid .ac img{width:100%;height:100%;object-fit:cover;cursor:pointer}
+  .album-grid .ac button{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:1}
+  .album-empty{color:#9c9684;font-size:13.5px;text-align:center;padding:14px}
+  .with-lock{color:var(--ember);cursor:pointer;text-decoration:underline;font-weight:600}
+  .settle-files{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+  .settle-files .sf{display:flex;align-items:center;gap:8px;background:#fffdf7;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13.5px}
+  .settle-files .sf .nm{flex:1;color:var(--bark);word-break:break-all;cursor:pointer;text-decoration:underline}
+  .settle-files .sf button{background:none;border:none;color:#b6ab90;font-size:17px;cursor:pointer}
+  .settle-files .sf button:hover{color:var(--ember)}
+  .receipt-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .receipt-grid .rc{position:relative;width:88px;height:88px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}
+  .receipt-grid .rc img{width:100%;height:100%;object-fit:cover;cursor:pointer}
+  .receipt-grid .rc button{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:13px;cursor:pointer;line-height:1}
+
   .settle-box{
     margin-top:16px;background:linear-gradient(180deg,#fff9ec,#f4ecd7);
     border:1px solid var(--line);border-radius:14px;padding:16px;
@@ -300,7 +335,45 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<!-- 로그인 화면 -->
+<div id="authScreen" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--canvas);overflow:auto;padding:24px 16px">
+  <div style="max-width:400px;margin:6vh auto 0">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:13px;letter-spacing:.3em;color:var(--moss)">CAMP · LOG</div>
+      <h1 style="font-family:Georgia,serif;font-size:38px;color:var(--bark);margin-top:8px">CampLog</h1>
+      <div style="color:var(--moss);font-size:14px;margin-top:6px">로그인하면 어느 기기에서든 내 캠핑 기록이 보여요</div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <div id="authTabs" style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-main" id="tabLogin" style="flex:1">로그인</button>
+        <button class="btn btn-ghost" id="tabSignup" style="flex:1">회원가입</button>
+      </div>
+      <label class="fld" for="authEmail">이메일</label>
+      <input id="authEmail" type="email" placeholder="example@email.com" autocomplete="email" />
+      <label class="fld" for="authPw">비밀번호</label>
+      <input id="authPw" type="password" placeholder="6자 이상" autocomplete="current-password" />
+      <div class="btn-row">
+        <button class="btn btn-main" id="authGo" style="width:100%">로그인</button>
+      </div>
+      <div id="authMsg" style="font-size:13.5px;margin-top:12px;text-align:center;min-height:20px"></div>
+      <div id="authHint" style="font-size:12.5px;color:var(--moss);margin-top:4px;text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 로그인 후 상단 바 -->
+<div id="userBar" style="display:none;background:var(--bark);color:#fff;padding:9px 16px;font-size:13px;position:sticky;top:0;z-index:500">
+  <div style="max-width:960px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <span id="userBarEmail" style="opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <span style="display:flex;align-items:center;gap:12px;flex:0 0 auto">
+      <span id="syncState" style="font-size:12px;opacity:.75"></span>
+      <button id="logoutBtn" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer">로그아웃</button>
+    </span>
+  </div>
+</div>
+
+<div class="wrap" id="mainApp" style="display:none">
 
   <header class="top">
     <div class="badge">Camp · Log</div>
@@ -412,11 +485,15 @@
   <!-- 1. 캠핑장 위치 -->
   <section class="card">
     <h2><span class="ico">🏕️</span> 캠핑장 위치</h2>
-    <p class="hint">캠핑장 이름이나 지역을 적고 ‘위치 표시’를 누르면, 아래 지도에 그 자리가 핀으로 표시돼요.</p>
+    <p class="hint">캠핑장 이름을 적고 아래 지도 버튼을 누르면 카카오맵·네이버지도에서 열려요. ‘날씨용 위치 표시’를 누르면 아래 작은 지도와 날씨에 쓸 위치가 잡혀요.</p>
     <label class="fld" for="placeInput">캠핑장 이름 또는 지역</label>
     <input id="placeInput" placeholder="예) 가평 자라섬 오토캠핑장" />
+    <div class="ext-map-btns" id="extMapBtns">
+      <a class="ext-map kakao" id="openKakao" target="_blank" rel="noopener">🗺️ 카카오맵에서 보기</a>
+      <a class="ext-map naver" id="openNaver" target="_blank" rel="noopener">🧭 네이버지도에서 보기</a>
+    </div>
     <div class="btn-row">
-      <button class="btn btn-main" id="findBtn">위치 표시</button>
+      <button class="btn btn-ghost" id="findBtn">날씨용 위치 표시 (선택)</button>
     </div>
     <div class="place-name" id="placeName"></div>
     <div id="map"></div>
@@ -442,6 +519,7 @@
     <div class="progress-label" id="progLabel">0개 중 0개 챙김</div>
     <ul class="checklist" id="checklist"></ul>
     <div class="add-row">
+      <select id="chkCatSel" style="flex:0 0 auto;width:auto"></select>
       <input id="chkInput" placeholder="준비물 추가 (예: 손전등)" />
       <button class="btn btn-main" id="chkAdd">추가</button>
     </div>
@@ -458,6 +536,7 @@
     <p class="hint">마트에서 살 것들을 적어 두세요. 담은 물건은 체크하면 줄이 그어져요.</p>
     <ul class="shop" id="shopList"></ul>
     <div class="add-row">
+      <select id="shopCatSel" style="flex:0 0 auto;width:auto"></select>
       <input id="shopInput" placeholder="살 것 추가 (예: 삼겹살 2근)" />
       <button class="btn btn-ember" id="shopAdd">추가</button>
     </div>
@@ -492,6 +571,18 @@
     <div class="deck-picked" id="deckPicked"></div>
   </section>
 
+  <!-- 5-2. 캠핑 사진 앨범 -->
+  <section class="card">
+    <h2><span class="ico">📸</span> 캠핑 사진 앨범</h2>
+    <p class="hint">이번 캠핑의 피칭 사진, 데크 사진, 풍경 사진을 올려 두세요. 여러 장 올릴 수 있어요. 캠핑을 저장하면 사진도 날짜별로 함께 저장돼요.</p>
+    <div class="file-import">
+      <label class="imp-btn" for="albumFile">사진 올리기</label>
+      <input id="albumFile" type="file" accept="image/*" multiple style="display:none" />
+      <span class="imp-help">JPG·PNG 사진을 여러 장 한꺼번에 올릴 수 있어요.</span>
+    </div>
+    <div class="album-grid" id="albumGrid"></div>
+  </section>
+
   <!-- 6. 돈 정산 -->
   <section class="card">
     <h2><span class="ico">💰</span> 비용 정산</h2>
@@ -514,9 +605,29 @@
       <span class="imp-help">엑셀 <b>첫 칸 항목 · 둘째 칸 금액 · 셋째 칸 낸 사람</b>. 예) 캠핑장 예약비, 90000, 나 — 처음엔 모두 함께 나누는 걸로 들어가요.</span>
     </div>
 
+    <label class="fld" style="margin-top:14px">🧾 영수증 사진 (JPG·PNG)</label>
+    <div class="file-import">
+      <label class="imp-btn" for="receiptFile">영수증 사진 추가</label>
+      <input id="receiptFile" type="file" accept="image/*" multiple style="display:none" />
+      <span class="imp-help">영수증을 사진으로 찍어 올려 두면 나중에 확인하기 좋아요. 여러 장 가능.</span>
+    </div>
+    <div class="receipt-grid" id="receiptGrid"></div>
+
+    <label class="fld" style="margin-top:14px">📎 정산 결과 파일 (그림·엑셀·PDF)</label>
+    <div class="file-import">
+      <label class="imp-btn" for="settleFileUp">정산 파일 첨부</label>
+      <input id="settleFileUp" type="file" accept="image/*,.xlsx,.xls,.csv,.pdf" multiple style="display:none" />
+      <span class="imp-help">정리해 둔 정산표(엑셀·그림·PDF)를 그대로 올려 보관할 수 있어요.</span>
+    </div>
+    <div class="settle-files" id="settleFileList"></div>
+
     <div class="settle-box" id="settleBox">
       <h3>💸 정산 결과</h3>
       <div id="settleContent"><div class="settle-empty">사람과 지출을 넣으면 여기에 정산 결과가 나와요.</div></div>
+      <div class="btn-row" id="shareRow" style="display:none">
+        <button class="btn btn-main" id="shareSettle">📤 정산 내용 공유하기</button>
+        <button class="btn btn-ghost" id="copySettle">📋 글자로 복사</button>
+      </div>
     </div>
   </section>
 
@@ -526,19 +637,37 @@
     <p class="hint">날짜와 함께 저장하면 아래 목록에 남아요. 앱을 껐다 켜도 그대로 있어요.</p>
     <div class="two">
       <div>
-        <label class="fld" for="tripDate">캠핑 날짜</label>
+        <label class="fld" for="tripDate">시작 날짜</label>
         <input id="tripDate" type="date" />
       </div>
       <div>
-        <label class="fld" for="tripWith">누구랑 / 메모</label>
-        <input id="tripWith" placeholder="예) 가족과 1박 2일" />
+        <label class="fld" for="tripEnd">끝나는 날짜</label>
+        <input id="tripEnd" type="date" />
       </div>
     </div>
+    <div id="nightsLabel" style="font-size:13.5px;color:var(--ember);font-weight:600;margin-top:8px"></div>
+    <label class="fld" for="tripWith">누구랑 / 메모</label>
+    <input id="tripWith" placeholder="예) 가족과 함께" />
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;color:var(--bark);cursor:pointer">
+      <input type="checkbox" id="tripLock" style="width:18px;height:18px;accent-color:var(--ember)">
+      🔒 ‘누구랑’ 내용을 비밀번호로 잠그기 (목록에서 가려지고, 볼 때 비번을 물어봐요)
+    </label>
     <div class="btn-row">
       <button class="btn btn-main" id="tripSave">현재 내용 저장</button>
     </div>
     <div id="tripList"></div>
     <div class="save-note">모든 내용은 이 기기 안에만 저장돼요. 다른 사람은 볼 수 없어요.</div>
+  </section>
+
+  <!-- 8. 전체 지도 (다녀온 곳 한눈에) -->
+  <section class="card">
+    <h2><span class="ico">🗺️</span> 내 캠핑 지도</h2>
+    <p class="hint">저장한 캠핑들이 지도에 한눈에 모여요. 핀을 누르면 어디였는지 나와요. (‘날씨용 위치 표시’로 위치를 잡고 저장한 캠핑만 나와요.)</p>
+    <div class="btn-row">
+      <button class="btn btn-main" id="allMapBtn">전체 지도 보기</button>
+    </div>
+    <div id="allMap" style="height:340px;border-radius:12px;border:1px solid var(--line);margin-top:12px;display:none;z-index:0"></div>
+    <div id="allMapNote" style="font-size:13px;color:var(--moss);margin-top:10px"></div>
   </section>
 
   <footer class="foot">CampLog · 지도는 OpenStreetMap, 날씨는 Open-Meteo 무료 서비스를 사용합니다</footer>
@@ -548,8 +677,61 @@
 /* ================= 저장 도우미 ================= */
 const store = {
   get(k, def){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } },
-  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  set(k, v){
+    try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
+    scheduleCloudSave();   // 바뀌면 인터넷에도 저장 예약
+  }
 };
+
+/* ================= 인터넷 저장 (supabase) ================= */
+const SB_URL = 'https://ldcxzlevznfrfmpluckk.supabase.co';
+const SB_KEY = 'sb_publishable_a6NeiZodJWxkDjt-_Wuiow_AT2OmYjX';
+let sb = null;
+let currentUser = null;
+// CampLog가 쓰는 저장 칸 이름들 (이 값들을 통째로 인터넷에 올린다)
+const CAMP_KEYS = ['camp_checklist','camp_shop','camp_deck_img','camp_deck_pins','camp_album',
+  'camp_members','camp_expenses','camp_receipts','camp_settlefiles','camp_trips','camp_place'];
+
+function collectAllData(){
+  const bag={};
+  CAMP_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) bag[k]=v; });
+  return bag;
+}
+function applyAllData(bag){
+  if(!bag) return;
+  CAMP_KEYS.forEach(k=>{ if(bag[k]!=null) localStorage.setItem(k, bag[k]); });
+}
+
+let cloudTimer=null, cloudBusy=false;
+function scheduleCloudSave(){
+  if(!sb || !currentUser) return;         // 로그인 안 했으면 인터넷 저장 안 함
+  setSync('저장 중…');
+  clearTimeout(cloudTimer);
+  cloudTimer=setTimeout(cloudSave, 1200); // 잠깐 모았다가 한 번에 저장
+}
+async function cloudSave(){
+  if(!sb || !currentUser || cloudBusy) return;
+  cloudBusy=true;
+  try{
+    const { error } = await sb.from('camplog_data').upsert({
+      user_id: currentUser.id,
+      data: collectAllData(),
+      updated_at: new Date().toISOString()
+    }, { onConflict:'user_id' });
+    setSync(error ? '저장 실패' : '저장됨 ✓');
+  }catch(e){ setSync('저장 실패'); }
+  cloudBusy=false;
+}
+async function cloudLoad(){
+  if(!sb || !currentUser) return;
+  setSync('불러오는 중…');
+  try{
+    const { data, error } = await sb.from('camplog_data').select('data').eq('user_id', currentUser.id).maybeSingle();
+    if(!error && data && data.data){ applyAllData(data.data); }
+    setSync('저장됨 ✓');
+  }catch(e){ setSync(''); }
+}
+function setSync(txt){ const el=document.getElementById('syncState'); if(el) el.textContent=txt; }
 
 /* ---- 엑셀·CSV 파일을 표(행 배열)로 읽기 ---- */
 function readSheet(file, onDone){
@@ -577,7 +759,13 @@ function looksLikeHeader(cell){
 let map, marker;
 let currentPlace = { name:"", lat:37.5665, lon:126.9780 }; // 기본: 서울
 
+function mapReady(){ return (typeof L !== 'undefined'); }
 function initMap(){
+  if(!mapReady()){
+    const el=document.getElementById('map');
+    if(el) el.innerHTML='<div style="padding:20px;text-align:center;color:#8ba888;font-size:13.5px">지도를 불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요.<br>(날씨·저장 등 다른 기능은 그대로 써도 돼요.)</div>';
+    return;
+  }
   map = L.map('map').setView([currentPlace.lat, currentPlace.lon], 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap'
@@ -586,13 +774,14 @@ function initMap(){
 }
 function setMap(lat, lon, name, zoom){
   currentPlace = { name:name||currentPlace.name, lat, lon };
+  store.set('camp_place', currentPlace);
+  if(!map) return;   // 지도가 없으면 좌표만 저장하고 끝
   map.setView([lat, lon], zoom||12);
   marker.setLatLng([lat, lon]);
   if(name){
     marker.bindPopup(name).openPopup();
     document.getElementById('placeName').innerHTML = '표시된 곳: <b>'+name+'</b>';
   }
-  store.set('camp_place', currentPlace);
 }
 
 /* 장소 검색 (무료 Nominatim) */
@@ -615,6 +804,15 @@ async function findPlace(){
     nameEl.textContent = '인터넷 연결을 확인해 주세요.';
   }
 }
+
+/* 카카오·네이버 지도 열기 링크 갱신 */
+function updateMapLinks(){
+  const q = document.getElementById('placeInput').value.trim() || '캠핑장';
+  const enc = encodeURIComponent(q);
+  document.getElementById('openKakao').href = 'https://map.kakao.com/?q='+enc;
+  document.getElementById('openNaver').href = 'https://map.naver.com/p/search/'+enc;
+}
+document.getElementById('placeInput').addEventListener('input', updateMapLinks);
 
 /* ================= 날씨 (Open-Meteo, 무료·키 불필요) ================= */
 const wxEmoji = code => {
@@ -669,12 +867,15 @@ async function loadWeather(){
 
 /* ================= 준비물 체크리스트 ================= */
 const defaultChecklist = [
-  {cat:'잠자리', items:['텐트','타프','그라운드시트','폴대·팩','고무망치','침낭','매트','베개']},
-  {cat:'주방', items:['버너','부탄가스','코펠·냄비','수저·젓가락','접시·컵','칼·도마','집게','식용유·양념','물통','아이스박스','수세미·세제','키친타월']},
+  {cat:'침실용품', items:['텐트','타프','그라운드시트','폴대·팩','고무망치','침낭','매트','베개']},
+  {cat:'주방용품', items:['버너','부탄가스','코펠·냄비','수저·젓가락','접시·컵','칼·도마','집게','물통','아이스박스','수세미·세제','키친타월']},
   {cat:'불·조명', items:['화로대','장작·숯','토치·라이터','랜턴','손전등','여분 건전지']},
-  {cat:'생활', items:['캠핑의자','테이블','돗자리','물티슈','휴지','수건','비상약','벌레퇴치제','쓰레기봉투','충전기·보조배터리']},
+  {cat:'생활용품', items:['캠핑의자','테이블','돗자리','물티슈','휴지','수건','비상약','벌레퇴치제','쓰레기봉투','충전기·보조배터리']},
+  {cat:'식자재', items:['쌀·햇반','고기','채소','식용유·양념','물·음료','간식']},
   {cat:'옷', items:['여벌 옷','따뜻한 겉옷','양말','모자','우비','슬리퍼']},
 ];
+// 분류 표시 순서 (자동 정렬용)
+const catOrder = ['침실용품','주방용품','식자재','생활용품','불·조명','옷','기타'];
 let checklistData = store.get('camp_checklist', null);
 let activeCat = '전체';
 
@@ -686,30 +887,50 @@ if(!checklistData){
 function saveChecklist(){ store.set('camp_checklist', checklistData); }
 
 function renderCats(){
-  const cats = ['전체', ...new Set(checklistData.map(i=>i.cat))];
   const box = document.getElementById('chkCats');
-  box.innerHTML = cats.map(c =>
-    '<button class="chk-cat'+(c===activeCat?' on':'')+'" data-c="'+c+'">'+c+'</button>'
-  ).join('');
-  box.querySelectorAll('.chk-cat').forEach(b=>{
-    b.onclick=()=>{ activeCat=b.dataset.c; renderCats(); renderChecklist(); };
-  });
+  box.innerHTML = '<button class="chk-cat" id="chkOpenAll">모두 펼치기</button>'
+    + '<button class="chk-cat" id="chkCloseAll">모두 접기</button>';
+  document.getElementById('chkOpenAll').onclick=()=>{
+    [...new Set(checklistData.map(i=>i.cat))].forEach(c=>openCats[c]=true); renderChecklist();
+  };
+  document.getElementById('chkCloseAll').onclick=()=>{ openCats={}; renderChecklist(); };
 }
+function catRank(c){ const i=catOrder.indexOf(c); return i<0?catOrder.length:i; }
+let openCats = {};  // 어떤 분류가 펼쳐졌는지 기억
 function renderChecklist(){
   const ul = document.getElementById('checklist');
-  const list = checklistData.filter(i=>activeCat==='전체'||i.cat===activeCat);
-  ul.innerHTML = list.map((i)=>{
+  if(!checklistData.length){ ul.innerHTML='<li class="empty" style="justify-content:center">준비물이 없어요.</li>'; updateProgress(); return; }
+
+  function itemLi(i){
     const idx = checklistData.indexOf(i);
     return '<li class="'+(i.done?'done':'')+'">'
       +'<input type="checkbox" data-i="'+idx+'" '+(i.done?'checked':'')+'>'
-      +'<span class="txt">'+i.txt+'<span style="color:#b6ab90;font-size:12px"> · '+i.cat+'</span></span>'
+      +'<span class="txt">'+i.txt+'</span>'
       +'<button class="del" data-d="'+idx+'">×</button></li>';
-  }).join('') || '<li class="empty" style="justify-content:center">이 칸에는 준비물이 없어요.</li>';
+  }
+
+  const cats = [...new Set(checklistData.map(i=>i.cat))].sort((a,b)=>catRank(a)-catRank(b));
+  ul.innerHTML = cats.map(cat=>{
+    const items = checklistData.filter(i=>i.cat===cat);
+    const doneN = items.filter(i=>i.done).length;
+    const isOpen = !!openCats[cat];
+    const head = '<li class="chk-head" data-cat="'+cat+'"><span class="arw">'+(isOpen?'▼':'▶')+'</span> '+cat+' <span class="cnt">'+doneN+'/'+items.length+'</span></li>';
+    const body = isOpen ? items.map(itemLi).join('') : '';
+    return head + body;
+  }).join('');
+
+  // 소제목 누르면 펼치기/접기
+  ul.querySelectorAll('.chk-head').forEach(h=>{
+    h.onclick=(e)=>{
+      if(e.target.closest('input,button')) return;
+      const c=h.dataset.cat; openCats[c]=!openCats[c]; renderChecklist();
+    };
+  });
   ul.querySelectorAll('input[type=checkbox]').forEach(cb=>{
-    cb.onchange=()=>{ checklistData[cb.dataset.i].done=cb.checked; saveChecklist(); renderChecklist(); updateProgress(); };
+    cb.onchange=()=>{ checklistData[cb.dataset.i].done=cb.checked; saveChecklist(); renderChecklist(); };
   });
   ul.querySelectorAll('.del').forEach(b=>{
-    b.onclick=()=>{ checklistData.splice(b.dataset.d,1); saveChecklist(); renderCats(); renderChecklist(); updateProgress(); };
+    b.onclick=(e)=>{ e.stopPropagation(); checklistData.splice(b.dataset.d,1); saveChecklist(); renderCats(); renderChecklist(); };
   });
   updateProgress();
 }
@@ -720,12 +941,17 @@ function updateProgress(){
   document.getElementById('progBar').style.width = pct+'%';
   document.getElementById('progLabel').textContent = total+'개 중 '+done+'개 챙김 ('+pct+'%)';
 }
+function fillChkCatSel(){
+  const sel=document.getElementById('chkCatSel');
+  const cats=[...new Set([...catOrder, ...checklistData.map(i=>i.cat)])];
+  sel.innerHTML=cats.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
+}
 document.getElementById('chkAdd').onclick=()=>{
   const inp=document.getElementById('chkInput'); const v=inp.value.trim();
   if(!v) return;
-  const cat = (activeCat==='전체')?'기타':activeCat;
+  const cat = document.getElementById('chkCatSel').value || '기타';
   checklistData.push({cat, txt:v, done:false});
-  saveChecklist(); inp.value=''; renderCats(); renderChecklist();
+  saveChecklist(); inp.value=''; renderCats(); fillChkCatSel(); renderChecklist();
 };
 document.getElementById('chkInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('chkAdd').click(); });
 document.getElementById('chkFile').addEventListener('change', function(){
@@ -748,25 +974,70 @@ document.getElementById('chkFile').addEventListener('change', function(){
 
 /* ================= 장보기 ================= */
 let shopData = store.get('camp_shop', []);
+// 옛 데이터에 분류 없으면 자동 추측해 채움
+let _shopFix=false;
+shopData.forEach(s=>{ if(!s.cat){ s.cat=guessShopCat(s.txt); _shopFix=true; } });
 function saveShop(){ store.set('camp_shop', shopData); }
+
+// 장보기 분류 순서
+const shopCatOrder = ['식자재','주류·음료','생활용품','기타'];
+// 물건 이름으로 분류 자동 추측
+function guessShopCat(txt){
+  const t=String(txt||'');
+  const living=['휴지','물티슈','수건','비닐','봉투','종이컵','나무젓','호일','랩','세제','수세미','건전지','부탄','숯','장작','토치','약','밴드','모기','벌레'];
+  const drink=['소주','맥주','와인','막걸리','양주','칵테일','하이볼','음료','콜라','사이다','생수','주스','커피','캔맥','병맥','탄산','이온'];
+  const food=['고기','삼겹','목살','항정','소고기','돼지','닭','계란','달걀','채소','상추','쌈','양파','마늘','대파','버섯','김치','쌀','햇반','라면','과자','간식','빵','우유','치즈','소시지','두부','떡','과일','수박','사과','귤','조미','소금','후추','기름','양념','소스','밥'];
+  // 생활용품을 먼저 확인 (물티슈 등이 음료로 새는 것 방지)
+  if(living.some(k=>t.includes(k))) return '생활용품';
+  if(drink.some(k=>t.includes(k))) return '주류·음료';
+  if(food.some(k=>t.includes(k))) return '식자재';
+  // '물'은 단독이거나 '병/통/L' 등과 함께일 때만 음료로
+  if(/(^|\s)물(\s|$|\d|병|통|리터|l)/i.test(t)) return '주류·음료';
+  return '기타';
+}
+if(_shopFix) saveShop();
+
+function fillShopCatSel(){
+  const sel=document.getElementById('shopCatSel');
+  sel.innerHTML='<option value="">자동 분류</option>'+shopCatOrder.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
+}
+function shopRank(c){ const i=shopCatOrder.indexOf(c); return i<0?shopCatOrder.length:i; }
+
+let openShopCats = {};
 function renderShop(){
   const ul=document.getElementById('shopList');
-  ul.innerHTML = shopData.map((s,i)=>
-    '<li class="'+(s.got?'got':'')+'">'
-    +'<input type="checkbox" data-i="'+i+'" '+(s.got?'checked':'')+'>'
-    +'<span>'+s.txt+'</span>'
-    +'<button class="del" data-d="'+i+'">×</button></li>'
-  ).join('') || '<li class="empty" style="justify-content:center">아직 적은 게 없어요. 살 것을 추가해 보세요.</li>';
+  if(!shopData.length){ ul.innerHTML='<li class="empty" style="justify-content:center">아직 적은 게 없어요. 살 것을 추가해 보세요.</li>'; return; }
+  function itemLi(s){
+    const idx=shopData.indexOf(s);
+    return '<li class="'+(s.got?'got':'')+'">'
+      +'<input type="checkbox" data-i="'+idx+'" '+(s.got?'checked':'')+'>'
+      +'<span>'+s.txt+'</span>'
+      +'<button class="del" data-d="'+idx+'">×</button></li>';
+  }
+  const cats=[...new Set(shopData.map(s=>s.cat||'기타'))].sort((a,b)=>shopRank(a)-shopRank(b));
+  ul.innerHTML = cats.map(cat=>{
+    const items=shopData.filter(s=>(s.cat||'기타')===cat);
+    const gotN=items.filter(s=>s.got).length;
+    const isOpen=!!openShopCats[cat];
+    const head='<li class="chk-head" data-cat="'+cat+'"><span class="arw">'+(isOpen?'▼':'▶')+'</span> '+cat+' <span class="cnt">'+gotN+'/'+items.length+'</span></li>';
+    return head + (isOpen ? items.map(itemLi).join('') : '');
+  }).join('');
+  ul.querySelectorAll('.chk-head').forEach(h=>{
+    h.onclick=(e)=>{ if(e.target.closest('input,button')) return; const c=h.dataset.cat; openShopCats[c]=!openShopCats[c]; renderShop(); };
+  });
   ul.querySelectorAll('input[type=checkbox]').forEach(cb=>{
     cb.onchange=()=>{ shopData[cb.dataset.i].got=cb.checked; saveShop(); renderShop(); };
   });
   ul.querySelectorAll('.del').forEach(b=>{
-    b.onclick=()=>{ shopData.splice(b.dataset.d,1); saveShop(); renderShop(); };
+    b.onclick=(e)=>{ e.stopPropagation(); shopData.splice(b.dataset.d,1); saveShop(); renderShop(); };
   });
 }
 document.getElementById('shopAdd').onclick=()=>{
   const inp=document.getElementById('shopInput'); const v=inp.value.trim();
-  if(!v) return; shopData.push({txt:v, got:false}); saveShop(); inp.value=''; renderShop();
+  if(!v) return;
+  const chosen=document.getElementById('shopCatSel').value;
+  const cat= chosen || guessShopCat(v);
+  shopData.push({txt:v, got:false, cat}); saveShop(); inp.value=''; renderShop();
 };
 document.getElementById('shopInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('shopAdd').click(); });
 document.getElementById('shopFile').addEventListener('change', function(){
@@ -777,7 +1048,7 @@ document.getElementById('shopFile').addEventListener('change', function(){
       const txt=String(r[0]||'').trim();
       if(!txt) return;
       if(idx===0 && looksLikeHeader(txt)) return;
-      shopData.push({txt, got:false});
+      shopData.push({txt, got:false, cat:guessShopCat(txt)});
       added++;
     });
     saveShop(); renderShop();
@@ -815,13 +1086,16 @@ function renderPins(){
     '<div class="pin" data-i="'+i+'" style="left:'+(p.x*100)+'%;top:'+(p.y*100)+'%">'
     +'<span class="cap">'+(i+1)+'</span>⛺</div>'
   ).join('');
+  // 핀을 누르면 그 핀 삭제
   layer.querySelectorAll('.pin').forEach(pin=>{
-    pin.onclick=(e)=>{
-      e.stopPropagation();
+    const handler=(e)=>{
+      e.stopPropagation();      // 빈 곳 클릭(새 핀)으로 번지지 않게
+      e.preventDefault();
       if(confirm((parseInt(pin.dataset.i)+1)+'번 핀을 지울까요?')){
         pins.splice(pin.dataset.i,1); saveDeck(); renderPins(); renderDeckPicked();
       }
     };
+    pin.addEventListener('click', handler);
   });
 }
 function renderDeckPicked(){
@@ -852,42 +1126,41 @@ document.getElementById('deckImgInput').addEventListener('change', function(){
   this.value='';
 });
 
-/* 사진 눌러 핀 찍기 (마우스 클릭 + 아이패드/아이폰 터치 모두 지원) */
+/* 빈 곳을 눌러 핀 찍기 — 클릭을 받는 대상은 '핀 층(pinLayer)' 이다 */
 (function(){
-  const img = document.getElementById('deckImg');
-  let touchStart = null;   // 손가락을 처음 댄 위치·시간
+  const layer = document.getElementById('pinLayer');
+  let touchStart = null;
 
   function addPinAt(clientX, clientY){
-    const rect = img.getBoundingClientRect();
+    const rect = layer.getBoundingClientRect();
     let x = (clientX - rect.left) / rect.width;
     let y = (clientY - rect.top) / rect.height;
-    // 사진 밖을 눌렀으면 무시
     if(x<0||x>1||y<0||y>1) return;
     pins.push({x, y});
     saveDeck(); renderPins(); renderDeckPicked();
   }
 
-  // 데스크톱 마우스
-  img.addEventListener('click', function(e){
-    // 터치로 이미 처리한 경우 중복 방지
-    if(e.__handledByTouch) return;
+  // 데스크톱(윈도우·맥) 마우스 클릭
+  layer.addEventListener('click', function(e){
+    // 핀 자체를 눌렀으면 여기서 처리 안 함 (핀 삭제가 이미 처리)
+    if(e.target.closest('.pin')) return;
     addPinAt(e.clientX, e.clientY);
   });
 
-  // 아이패드/아이폰/안드로이드 터치
-  img.addEventListener('touchstart', function(e){
+  // 태블릿·폰 터치
+  layer.addEventListener('touchstart', function(e){
+    if(e.target.closest('.pin')) { touchStart=null; return; }
     const t = e.changedTouches[0];
     touchStart = { x:t.clientX, y:t.clientY, time:Date.now() };
   }, {passive:true});
 
-  img.addEventListener('touchend', function(e){
+  layer.addEventListener('touchend', function(e){
     if(!touchStart) return;
     const t = e.changedTouches[0];
     const moved = Math.abs(t.clientX-touchStart.x) + Math.abs(t.clientY-touchStart.y);
     const elapsed = Date.now() - touchStart.time;
-    // 살짝 톡 눌렀을 때만 핀 찍기 (스크롤·확대 동작과 구분)
-    if(moved < 14 && elapsed < 600){
-      e.preventDefault();               // 뒤이어 오는 가짜 click 막기
+    if(moved < 16 && elapsed < 700){
+      e.preventDefault();     // 뒤따르는 가짜 click 방지
       addPinAt(t.clientX, t.clientY);
     }
     touchStart = null;
@@ -905,12 +1178,101 @@ document.getElementById('deckClearAll').onclick=()=>{
   }
 };
 
+/* ================= 캠핑 사진 앨범 ================= */
+let album = store.get('camp_album', []); // [dataURL,...]
+function saveAlbum(){ store.set('camp_album', album); }
+function renderAlbum(){
+  const g=document.getElementById('albumGrid');
+  if(!album.length){ g.innerHTML='<div class="album-empty">아직 올린 사진이 없어요.</div>'; return; }
+  g.innerHTML = album.map((src,i)=>
+    '<div class="ac"><img src="'+src+'" data-view="'+i+'"><button data-del="'+i+'">×</button></div>'
+  ).join('');
+  g.querySelectorAll('img[data-view]').forEach(im=>{
+    im.onclick=()=>{ const w=window.open(); if(w) w.document.write('<img src="'+album[im.dataset.view]+'" style="max-width:100%">'); };
+  });
+  g.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick=()=>{ if(confirm('이 사진을 지울까요?')){ album.splice(b.dataset.del,1); saveAlbum(); renderAlbum(); } };
+  });
+}
+document.getElementById('albumFile').addEventListener('change', function(){
+  const files=[...this.files]; if(!files.length) return;
+  let left=files.length;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=e=>{ album.push(e.target.result); left--; if(left===0){ saveAlbum(); renderAlbum(); } };
+    r.readAsDataURL(f);
+  });
+  this.value='';
+});
+
 /* ================= 비용 정산 ================= */
 let members = store.get('camp_members', []);      // ['나','철수']
 let expenses = store.get('camp_expenses', []);    // [{id,title,amount,payer,sharers:[]}]
 
 function saveSplit(){ store.set('camp_members', members); store.set('camp_expenses', expenses); }
 const won = n => (Math.round(n)).toLocaleString('ko-KR')+'원';
+
+/* 몇 박 며칠 (목록 표시용 전역) */
+function nightsTextGlobal(startV, endV){
+  if(!startV||!endV) return '';
+  const days=Math.round((new Date(endV)-new Date(startV))/86400000);
+  if(days<0) return '';
+  if(days===0) return '당일';
+  return days+'박'+(days+1)+'일';
+}
+
+/* 영수증 사진 */
+let receipts = store.get('camp_receipts', []); // [dataURL, ...]
+function saveReceipts(){ store.set('camp_receipts', receipts); }
+function renderReceipts(){
+  const g=document.getElementById('receiptGrid');
+  g.innerHTML = receipts.map((src,i)=>
+    '<div class="rc"><img src="'+src+'" data-view="'+i+'"><button data-del="'+i+'">×</button></div>'
+  ).join('');
+  g.querySelectorAll('img[data-view]').forEach(im=>{
+    im.onclick=()=>{ const w=window.open(); if(w) w.document.write('<img src="'+receipts[im.dataset.view]+'" style="max-width:100%">'); };
+  });
+  g.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick=()=>{ receipts.splice(b.dataset.del,1); saveReceipts(); renderReceipts(); };
+  });
+}
+document.getElementById('receiptFile').addEventListener('change', function(){
+  const files=[...this.files]; if(!files.length) return;
+  let left=files.length;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=e=>{ receipts.push(e.target.result); left--; if(left===0){ saveReceipts(); renderReceipts(); } };
+    r.readAsDataURL(f);
+  });
+  this.value='';
+});
+
+/* 정산 결과 파일 (그림·엑셀·PDF) */
+let settleFiles = store.get('camp_settlefiles', []); // [{name, data}]
+function saveSettleFiles(){ store.set('camp_settlefiles', settleFiles); }
+function renderSettleFiles(){
+  const box=document.getElementById('settleFileList');
+  box.innerHTML = settleFiles.map((f,i)=>{
+    const icon = /image\//.test(f.data)?'🖼️':(/pdf/.test(f.data)?'📕':'📊');
+    return '<div class="sf">'+icon+' <span class="nm" data-open="'+i+'">'+f.name+'</span><button data-del="'+i+'">×</button></div>';
+  }).join('');
+  box.querySelectorAll('.nm').forEach(el=>{
+    el.onclick=()=>{ const w=window.open(); if(w) w.document.write('<iframe src="'+settleFiles[el.dataset.open].data+'" style="width:100%;height:100%;border:none"></iframe>'); };
+  });
+  box.querySelectorAll('button[data-del]').forEach(b=>{
+    b.onclick=()=>{ settleFiles.splice(b.dataset.del,1); saveSettleFiles(); renderSettleFiles(); };
+  });
+}
+document.getElementById('settleFileUp').addEventListener('change', function(){
+  const files=[...this.files]; if(!files.length) return;
+  let left=files.length;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=e=>{ settleFiles.push({name:f.name, data:e.target.result}); left--; if(left===0){ saveSettleFiles(); renderSettleFiles(); } };
+    r.readAsDataURL(f);
+  });
+  this.value='';
+});
 
 /* --- 사람 --- */
 function renderMembers(){
@@ -1064,7 +1426,53 @@ function renderSettle(){
     + rows
     + '<div class="transfers"><div class="lbl2" style="font-size:13px;color:var(--moss);margin-bottom:2px">💌 이렇게 보내면 정산 끝!</div>'
     + transfers + '</div>';
+
+  // 공유용 글자 만들기
+  let shareText = '🏕️ '+(document.getElementById('placeInput').value.trim()||'캠핑')+' 정산\n';
+  const dV=document.getElementById('tripDate') ? document.getElementById('tripDate').value : '';
+  if(dV) shareText += '📅 '+dV+'\n';
+  shareText += '━━━━━━━━━━\n전체 지출: '+won(total)+' ('+members.length+'명)\n\n[항목]\n';
+  valid.forEach(e=>{ shareText += '· '+(e.title||'지출')+' '+won(e.amount)+' ('+e.payer+' 냄)\n'; });
+  shareText += '\n[한 사람당]\n';
+  members.forEach(m=>{
+    const b=Math.round(bal[m]);
+    shareText += '· '+m+': '+(b>0?('+'+won(b)+' 받을 돈'):(b<0?(won(-b)+' 낼 돈'):'0원'))+'\n';
+  });
+  shareText += '\n[송금]\n';
+  const cr2=members.map(m=>({name:m,amt:Math.round(bal[m])})).filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt);
+  const db2=members.map(m=>({name:m,amt:-Math.round(bal[m])})).filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt);
+  let i2=0,j2=0; let hasT=false;
+  while(i2<cr2.length&&j2<db2.length){
+    const g=Math.min(cr2[i2].amt,db2[j2].amt);
+    shareText += '· '+db2[j2].name+' → '+cr2[i2].name+' '+won(g)+'\n'; hasT=true;
+    cr2[i2].amt-=g; db2[j2].amt-=g;
+    if(cr2[i2].amt===0)i2++; if(db2[j2].amt===0)j2++;
+  }
+  if(!hasT) shareText += '· 주고받을 돈 없음 (딱 맞음)\n';
+  window._settleShareText = shareText;
+  document.getElementById('shareRow').style.display='flex';
 }
+
+/* 정산 공유 / 복사 */
+document.getElementById('shareSettle').onclick=async()=>{
+  const text=window._settleShareText||'';
+  if(!text){ alert('먼저 정산 내용을 입력해 주세요.'); return; }
+  if(navigator.share){
+    try{ await navigator.share({title:'캠핑 정산', text}); }catch(e){}
+  }else{
+    try{ await navigator.clipboard.writeText(text); alert('정산 내용을 복사했어요! 카카오톡 등에 붙여넣기 하세요.'); }
+    catch(e){ alert('공유가 안 되는 기기예요. 아래 ‘글자로 복사’를 눌러 주세요.'); }
+  }
+};
+document.getElementById('copySettle').onclick=async()=>{
+  const text=window._settleShareText||'';
+  if(!text){ alert('먼저 정산 내용을 입력해 주세요.'); return; }
+  try{ await navigator.clipboard.writeText(text); alert('정산 내용을 복사했어요! 원하는 곳에 붙여넣기(길게 눌러 붙여넣기) 하세요.'); }
+  catch(e){
+    // 복사가 막힌 환경: 텍스트를 보여줘서 직접 복사
+    prompt('아래 내용을 길게 눌러 복사하세요:', text);
+  }
+};
 
 /* ================= 캠핑 저장 ================= */
 let trips = store.get('camp_trips', []);
@@ -1106,8 +1514,12 @@ function renderTrips(){
     let spent = 0;
     if(t.expenses) t.expenses.forEach(e=>{ if(e.amount>0) spent += e.amount; });
     const spentTxt = spent>0 ? (' · 💰 '+Math.round(spent).toLocaleString('ko-KR')+'원') : '';
+    const withHtml = t.withLocked
+      ? '<span class="with-lock" data-lock="'+t.id+'">🔒 비공개 (눌러서 보기)</span>'
+      : (t.with||'');
+    const nights = (t.date&&t.end)? (' · 🏕️ '+nightsTextGlobal(t.date,t.end)) : '';
     return '<div class="trip"><div class="th"><b>'+(t.place||'캠핑')+'</b><span class="when">'+fmt(t)+'</span></div>'
-      +'<div class="meta">'+(t.with||'')+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
+      +'<div class="meta">'+withHtml+nights+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
       +'<div class="tbtns"><button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>'
       +'<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>'
       +'<button class="btn btn-ghost" data-del="'+t.id+'">삭제</button></div></div>';
@@ -1128,6 +1540,17 @@ function renderTrips(){
   }
   box.innerHTML = html;
 
+  // 비공개 '누구랑' 잠금 열기
+  box.querySelectorAll('.with-lock').forEach(el=>{
+    el.onclick=()=>{
+      const t=trips.find(x=>x.id==el.dataset.lock); if(!t) return;
+      const pw=prompt('비밀번호를 입력하세요:');
+      if(pw===null) return;
+      if(pw===t.withPw){ el.outerHTML='<span style="color:var(--bark)">🔓 '+ (t.with||'') +'</span>'; }
+      else alert('비밀번호가 달라요.');
+    };
+  });
+
   function applyTrip(t, asCopy){
     checklistData = JSON.parse(JSON.stringify(t.checklist)); saveChecklist();
     shopData = JSON.parse(JSON.stringify(t.shop)); saveShop();
@@ -1140,13 +1563,24 @@ function renderTrips(){
     expenses = t.expenses ? JSON.parse(JSON.stringify(t.expenses)) : [];
     if(asCopy){ expenses.forEach(e=>{ e.amount=0; }); }
     saveSplit();
+    receipts = t.receipts ? JSON.parse(JSON.stringify(t.receipts)) : [];
+    if(asCopy) receipts=[];
+    saveReceipts();
+    settleFiles = t.settleFiles ? JSON.parse(JSON.stringify(t.settleFiles)) : [];
+    if(asCopy) settleFiles=[];
+    saveSettleFiles();
+    album = t.album ? JSON.parse(JSON.stringify(t.album)) : [];
+    if(asCopy) album=[];
+    saveAlbum();
     if(t.lat){ setMap(t.lat,t.lon,t.place, asCopy?11:12); }
     document.getElementById('placeInput').value = asCopy ? '' : (document.getElementById('placeInput').value);
     document.getElementById('tripDate').value = asCopy ? '' : (t.date||'');
+    document.getElementById('tripEnd').value = asCopy ? '' : (t.end||'');
+    updateNights();
     document.getElementById('tripWith').value = asCopy ? '' : (t.with||'');
-    renderCats(); renderChecklist(); renderShop();
+    renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShop();
     showDeck();
-    renderMembers(); renderExpenses(); renderSettle();
+    renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -1171,38 +1605,226 @@ function renderTrips(){
   });
 }
 document.getElementById('tripSave').onclick=()=>{
+  const withVal = document.getElementById('tripWith').value.trim();
+  const locked = document.getElementById('tripLock').checked;
+  let lockPw = '';
+  if(locked && withVal){
+    lockPw = prompt('이 ‘누구랑’ 내용을 열 때 쓸 비밀번호를 정해 주세요. (숫자·글자 자유)');
+    if(lockPw===null){ return; }         // 취소하면 저장 중단
+    if(!lockPw.trim()){ alert('비밀번호가 비어 있어 잠그지 않고 저장할게요.'); }
+  }
   trips.unshift({
     id: Date.now(),
     place: currentPlace.name || document.getElementById('placeInput').value.trim() || '캠핑',
     lat: currentPlace.lat, lon: currentPlace.lon,
     date: document.getElementById('tripDate').value,
-    with: document.getElementById('tripWith').value.trim(),
+    end: document.getElementById('tripEnd').value,
+    with: withVal,
+    withLocked: (locked && withVal && lockPw.trim()) ? true : false,
+    withPw: (locked && withVal && lockPw.trim()) ? lockPw.trim() : '',
     deckImg: deckImg,
     deckPins: JSON.parse(JSON.stringify(pins)),
     members: JSON.parse(JSON.stringify(members)),
     expenses: JSON.parse(JSON.stringify(expenses)),
+    receipts: JSON.parse(JSON.stringify(receipts)),
+    settleFiles: JSON.parse(JSON.stringify(settleFiles)),
+    album: JSON.parse(JSON.stringify(album)),
     checklist: JSON.parse(JSON.stringify(checklistData)),
     shop: JSON.parse(JSON.stringify(shopData))
   });
   saveTrips(); renderTrips();
+  document.getElementById('tripLock').checked=false;
   alert('저장했어요! 아래 목록에 날짜순으로 정리돼요.');
 };
 
 /* ================= 시작 ================= */
+/* 몇 박 며칠 자동 계산 */
+function nightsText(startV, endV){
+  if(!startV || !endV) return '';
+  const s=new Date(startV), e=new Date(endV);
+  const days=Math.round((e-s)/86400000);
+  if(days<0) return '⚠️ 끝나는 날이 시작보다 빨라요.';
+  if(days===0) return '당일치기 (무박)';
+  return days+'박 '+(days+1)+'일';
+}
+function updateNights(){
+  document.getElementById('nightsLabel').textContent =
+    nightsText(document.getElementById('tripDate').value, document.getElementById('tripEnd').value);
+}
+document.getElementById('tripDate').addEventListener('change', updateNights);
+document.getElementById('tripEnd').addEventListener('change', updateNights);
+
 document.getElementById('findBtn').onclick=findPlace;
 document.getElementById('wxBtn').onclick=loadWeather;
 document.getElementById('placeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') findPlace(); });
 
-const savedPlace = store.get('camp_place', null);
-if(savedPlace){ currentPlace = savedPlace; }
-initMap();
-if(savedPlace && savedPlace.name){
-  document.getElementById('placeName').innerHTML='표시된 곳: <b>'+savedPlace.name+'</b>';
-  marker.bindPopup(savedPlace.name);
+/* 앱 화면 전체 그리기 (로그인 후 호출) */
+let _mapStarted=false;
+function renderEverything(){
+  const savedPlace = store.get('camp_place', null);
+  if(savedPlace){ currentPlace = savedPlace; }
+  if(!_mapStarted){ initMap(); _mapStarted=true; }
+  if(savedPlace && savedPlace.name){
+    document.getElementById('placeName').innerHTML='표시된 곳: <b>'+savedPlace.name+'</b>';
+    if(marker) marker.bindPopup(savedPlace.name);
+  }
+  // 저장 칸에서 최신값 다시 읽기 (인터넷에서 불러온 뒤 반영)
+  checklistData = store.get('camp_checklist', checklistData);
+  shopData = store.get('camp_shop', shopData);
+  deckImg = store.get('camp_deck_img', null);
+  pins = store.get('camp_deck_pins', []);
+  album = store.get('camp_album', []);
+  members = store.get('camp_members', []);
+  expenses = store.get('camp_expenses', []);
+  receipts = store.get('camp_receipts', []);
+  settleFiles = store.get('camp_settlefiles', []);
+  trips = store.get('camp_trips', []);
+  renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShop(); renderTrips();
+  showDeck();
+  renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum();
+  updateMapLinks();
 }
-renderCats(); renderChecklist(); renderShop(); renderTrips();
-showDeck();
-renderMembers(); renderExpenses(); renderSettle();
+
+/* ================= 로그인 ================= */
+let authMode='login';
+function setAuthMode(m){
+  authMode=m;
+  document.getElementById('tabLogin').className = 'btn '+(m==='login'?'btn-main':'btn-ghost');
+  document.getElementById('tabSignup').className = 'btn '+(m==='signup'?'btn-main':'btn-ghost');
+  document.getElementById('authGo').textContent = (m==='login'?'로그인':'회원가입');
+  document.getElementById('authMsg').textContent='';
+  document.getElementById('authHint').textContent = (m==='signup')
+    ? '가입하면 확인 메일이 갈 수 있어요. 메일의 링크를 누르면 가입이 끝나요.' : '';
+}
+document.getElementById('tabLogin').onclick=()=>setAuthMode('login');
+document.getElementById('tabSignup').onclick=()=>setAuthMode('signup');
+
+function showAuthMsg(txt, ok){
+  const el=document.getElementById('authMsg');
+  el.textContent=txt; el.style.color = ok ? 'var(--moss)' : 'var(--ember)';
+}
+
+async function doAuth(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pw=document.getElementById('authPw').value;
+  if(!email || !pw){ showAuthMsg('이메일과 비밀번호를 모두 입력해 주세요.'); return; }
+  if(pw.length<6){ showAuthMsg('비밀번호는 6자 이상이어야 해요.'); return; }
+  document.getElementById('authGo').disabled=true;
+  showAuthMsg('잠시만요…', true);
+  try{
+    if(authMode==='signup'){
+      const { data, error } = await sb.auth.signUp({ email, password: pw });
+      if(error){ showAuthMsg(translateErr(error.message)); }
+      else if(data.user && !data.session){
+        showAuthMsg('가입 확인 메일을 보냈어요. 메일함에서 링크를 누른 뒤 로그인해 주세요.', true);
+        setAuthMode('login');
+      }else{
+        onLoggedIn(data.user);
+      }
+    }else{
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+      if(error){ showAuthMsg(translateErr(error.message)); }
+      else { onLoggedIn(data.user); }
+    }
+  }catch(e){ showAuthMsg('연결에 문제가 생겼어요. 인터넷을 확인해 주세요.'); }
+  document.getElementById('authGo').disabled=false;
+}
+function translateErr(m){
+  m=String(m||'');
+  if(/Invalid login/i.test(m)) return '이메일 또는 비밀번호가 맞지 않아요.';
+  if(/already registered/i.test(m)) return '이미 가입된 이메일이에요. ‘로그인’으로 들어와 주세요.';
+  if(/Email not confirmed/i.test(m)) return '메일 확인이 아직 안 됐어요. 메일함의 링크를 눌러 주세요.';
+  return m;
+}
+document.getElementById('authGo').onclick=doAuth;
+document.getElementById('authPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
+
+async function onLoggedIn(user){
+  currentUser=user;
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('userBar').style.display='block';
+  document.getElementById('mainApp').style.display='block';
+  document.getElementById('userBarEmail').textContent='👤 '+(user.email||'로그인됨');
+  await cloudLoad();     // 인터넷 자료 먼저 가져오기
+  renderEverything();    // 화면 그리기
+  setTimeout(()=>{ if(map) map.invalidateSize(); }, 200);
+}
+
+document.getElementById('logoutBtn').onclick=async()=>{
+  if(!confirm('로그아웃할까요?')) return;
+  try{ await sb.auth.signOut(); }catch(e){}
+  currentUser=null;
+  document.getElementById('userBar').style.display='none';
+  document.getElementById('mainApp').style.display='none';
+  document.getElementById('authScreen').style.display='block';
+  document.getElementById('authEmail').value='';
+  document.getElementById('authPw').value='';
+  setAuthMode('login');
+};
+
+/* 앱 시작: supabase 준비하고 로그인 상태 확인 */
+(async function startApp(){
+  setAuthMode('login');
+  if(typeof supabase==='undefined'){
+    // 연결 도구를 못 불러온 경우: 로그인 없이 기기 저장으로라도 동작
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('mainApp').style.display='block';
+    renderEverything();
+    return;
+  }
+  sb = supabase.createClient(SB_URL, SB_KEY);
+  const { data } = await sb.auth.getSession();
+  if(data.session && data.session.user){
+    onLoggedIn(data.session.user);   // 이미 로그인돼 있으면 바로 입장
+  }else{
+    document.getElementById('authScreen').style.display='block';
+  }
+})();
+
+/* ================= 내 캠핑 전체 지도 ================= */
+let allMap = null;
+let allMapMarkers = [];
+document.getElementById('allMapBtn').onclick = function(){
+  const mapDiv = document.getElementById('allMap');
+  const note = document.getElementById('allMapNote');
+  if(!mapReady()){
+    note.textContent = '지도를 불러오지 못했어요. 인터넷을 확인하고 새로고침한 뒤 다시 눌러 주세요.';
+    return;
+  }
+  mapDiv.style.display = 'block';
+
+  // 위치(좌표)가 있는 캠핑만 모으기
+  const spots = trips.filter(t=>t.lat && t.lon);
+  if(!spots.length){
+    note.textContent = '아직 지도에 표시할 캠핑이 없어요. 캠핑을 저장할 때 위쪽 ‘날씨용 위치 표시’를 눌러 위치를 잡아 두면 여기에 핀으로 모여요.';
+    if(allMap){ allMapMarkers.forEach(m=>m.remove()); allMapMarkers=[]; }
+    return;
+  }
+
+  // 지도 처음 만들기 (한 번만)
+  if(!allMap){
+    allMap = L.map('allMap').setView([36.5, 127.8], 7); // 대한민국 전체
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(allMap);
+  }
+  // 기존 핀 지우고 다시 찍기
+  allMapMarkers.forEach(m=>m.remove()); allMapMarkers=[];
+
+  const dow=['일','월','화','수','목','금','토'];
+  spots.forEach(t=>{
+    let when='';
+    if(t.date){ const d=new Date(t.date); when=(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
+    const popup='<b>'+(t.place||'캠핑')+'</b>'+(when?('<br>'+when):'')+(t.with?('<br>'+t.with):'');
+    const mk=L.marker([t.lat,t.lon]).addTo(allMap).bindPopup(popup);
+    allMapMarkers.push(mk);
+  });
+
+  // 모든 핀이 다 보이게 지도 범위 맞추기
+  const group=L.featureGroup(allMapMarkers);
+  allMap.fitBounds(group.getBounds().pad(0.3));
+  setTimeout(()=>allMap.invalidateSize(), 200); // 방금 펼쳐진 지도 크기 보정
+
+  note.textContent = '📍 지도에 '+spots.length+'곳이 표시됐어요. 핀을 누르면 어디였는지 볼 수 있어요.';
+};
 </script>
 </body>
 </html>
