@@ -244,6 +244,24 @@
     margin-left:7px;vertical-align:middle;
   }
 
+  .join-badge{
+    display:inline-block;background:var(--moss);color:#fff;
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;
+    margin-left:7px;vertical-align:middle;
+  }
+  .trip.trip-dim{opacity:.82}
+  .trip.trip-dim .meta{color:#a49c86}
+
+  /* ---- 캠핑 참여자 고르기 ---- */
+  .member-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;
+    background:#fffdf7;border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:44px;align-items:center}
+  .member-picks .mp-empty{font-size:13px;color:#9c9684;line-height:1.6}
+  .mp-item{
+    font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;user-select:none;
+    border:1px solid var(--sage);background:transparent;color:var(--bark);word-break:break-all;
+  }
+  .mp-item.on{background:var(--moss);color:#fff;border-color:var(--moss)}
+
   /* ---- 계정 역할 ---- */
   .role-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
   .role-badge.admin{background:#c96f3f;color:#fff}
@@ -716,6 +734,11 @@
     <div id="nightsLabel" style="font-size:13.5px;color:var(--ember);font-weight:600;margin-top:8px"></div>
     <label class="fld" for="tripWith">누구랑 / 메모</label>
     <input id="tripWith" placeholder="예) 가족과 함께" />
+
+    <label class="fld">이 캠핑에 함께 간 사람 <span style="color:var(--moss);font-weight:400">(고른 사람만 이 기록을 볼 수 있어요)</span></label>
+    <div class="member-picks" id="tripMemberPicks">
+      <span class="mp-empty">가입한 사람이 없어요. 함께 갈 분이 회원가입하면 여기에 나타나요.</span>
+    </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;color:var(--bark);cursor:pointer">
       <input type="checkbox" id="tripLock" style="width:18px;height:18px;accent-color:var(--ember)">
       🔒 ‘누구랑’ 내용을 비밀번호로 잠그기 (목록에서 가려지고, 볼 때 비번을 물어봐요)
@@ -742,8 +765,8 @@
   <section class="card" id="adminSection" style="display:none">
     <h2><span class="ico">⚙️</span> 계정 관리 <span class="admin-only-tag">관리자 전용</span></h2>
     <p class="hint">함께 쓰는 분들의 역할을 정할 수 있어요. 새로 가입한 사람은 자동으로 <b>열람자</b>가 돼요.<br>
-      <b>관리자</b>는 모든 걸 할 수 있고, <b>팀원</b>은 기록을 함께 보고 입력할 수 있어요.
-      <b>열람자</b>는 보기만 가능하고 ‘누구랑’·정산·영수증은 가려져요.</p>
+      <b>관리자</b>는 모든 걸 볼 수 있어요. <b>팀원</b>은 캠핑 목록을 다 보되, <b>자기가 함께 간 캠핑</b>만 속 내용(누구랑·정산·영수증)까지 볼 수 있어요.
+      <b>열람자</b>는 보기만 가능하고 개인정보는 모두 가려져요.</p>
     <div id="adminList"></div>
     <div class="btn-row">
       <button class="btn btn-ghost" id="adminRefresh">목록 새로고침</button>
@@ -1941,7 +1964,14 @@ function saveTrips(){ store.set('camp_trips', trips); }
 if(_needSave) saveTrips();
 function renderTrips(){
   const box=document.getElementById('tripList');
-  if(!trips.length){ box.innerHTML='<div class="empty">아직 저장한 캠핑이 없어요.</div>'; return; }
+  // 내가 볼 수 있는 캠핑만 걸러내기
+  const visibleTrips = (typeof canSeeTrip==='function') ? trips.filter(canSeeTrip) : trips;
+  if(!visibleTrips.length){
+    box.innerHTML='<div class="empty">'
+      + (trips.length ? '함께 간 캠핑 기록이 아직 없어요.' : '아직 저장한 캠핑이 없어요.')
+      + '</div>';
+    return;
+  }
 
   // 오늘 날짜 (시간 제외)
   const today = new Date(); today.setHours(0,0,0,0);
@@ -1949,7 +1979,7 @@ function renderTrips(){
 
   // 예정(오늘 이후) / 다녀옴(과거) / 날짜없음 으로 분류
   const upcoming = [], past = [], undated = [];
-  trips.forEach(t=>{
+  visibleTrips.forEach(t=>{
     if(!t.date){ undated.push(t); return; }
     const d = new Date(t.date); d.setHours(0,0,0,0);
     if(d >= today) upcoming.push(t); else past.push(t);
@@ -1963,14 +1993,14 @@ function renderTrips(){
   function placeKey(t){ return String(t.place||'캠핑').replace(/\s/g,'').toLowerCase(); }
   const visitCount = {};   // 캠핑장별 총 횟수
   const placeLabel = {};   // 화면에 보여줄 이름
-  trips.forEach(t=>{
+  visibleTrips.forEach(t=>{
     const k = placeKey(t);
     visitCount[k] = (visitCount[k]||0) + 1;
     if(!placeLabel[k]) placeLabel[k] = t.place || '캠핑';
   });
   // 각 캠핑이 그 캠핑장의 몇 번째 방문인지 (날짜 순서 기준)
   const orderNo = {};
-  const byDate = [...trips].sort((a,b)=>{
+  const byDate = [...visibleTrips].sort((a,b)=>{
     const da = a.date ? new Date(a.date).getTime() : 0;
     const db = b.date ? new Date(b.date).getTime() : 0;
     return da - db;
@@ -1995,9 +2025,10 @@ function renderTrips(){
     const done = t.checklist.filter(x=>x.done).length;
     let spent = 0;
     if(t.expenses) t.expenses.forEach(e=>{ if(e.amount>0) spent += e.amount; });
-    const viewerMode = (typeof canEdit === 'function') && !canEdit();
-    const spentTxt = (spent>0 && !viewerMode) ? (' · 💰 '+Math.round(spent).toLocaleString('ko-KR')+'원') : '';
-    const withHtml = viewerMode
+    // 이 캠핑의 속 내용을 볼 수 있는지 (캠핑마다 다름)
+    const detail = (typeof canSeeTripDetail === 'function') ? canSeeTripDetail(t) : true;
+    const spentTxt = (spent>0 && detail) ? (' · 💰 '+Math.round(spent).toLocaleString('ko-KR')+'원') : '';
+    const withHtml = !detail
       ? '<span style="color:#9c9684">🔒 비공개</span>'
       : (t.withLocked
           ? '<span class="with-lock" data-lock="'+t.id+'">🔒 비공개 (눌러서 보기)</span>'
@@ -2016,12 +2047,17 @@ function renderTrips(){
     const visitBadge = (total > 1)
       ? '<span class="visit-badge" title="이 캠핑장 '+total+'번 중 '+nth+'번째">'+nth+'번째</span>'
       : '';
-    return '<div class="trip"><div class="th"><b>'+(t.place||'캠핑')+visitBadge+'</b><span class="when">'+fmt(t)+'</span></div>'
+    // 내가 함께 간 캠핑이면 표시
+    const joinBadge = (detail && !isAdmin() && myRole==='member')
+      ? '<span class="join-badge">함께 간 캠핑</span>' : '';
+    return '<div class="trip'+(detail?'':' trip-dim')+'"><div class="th"><b>'+(t.place||'캠핑')+visitBadge+joinBadge+'</b><span class="when">'+fmt(t)+'</span></div>'
       +(t.addr && t.addr!==t.place ? '<div style="font-size:12.5px;color:#9c9684;margin-top:2px">📍 '+t.addr+'</div>' : '')
       +'<div class="meta">'+withHtml+nights+wxTxt+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
-      +'<div class="tbtns"><button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>'
-      +'<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>'
-      +'<button class="btn btn-ghost" data-del="'+t.id+'">삭제</button></div></div>';
+      +'<div class="tbtns">'
+      + (detail ? '<button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>' : '')
+      + (canEdit() ? '<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>' : '')
+      + ((isAdmin() || (detail && canEdit())) ? '<button class="btn btn-ghost" data-del="'+t.id+'">삭제</button>' : '')
+      + '</div></div>';
   }
 
   let html='';
@@ -2033,7 +2069,7 @@ function renderTrips(){
   if(rank.length){
     const repeat = rank.filter(r=>r.n>1).length;
     html += '<div class="visit-summary">'
-      + '<div class="vs-title">📊 캠핑장별 다녀온 횟수 <small>총 '+trips.length+'번 · '+rank.length+'곳'
+      + '<div class="vs-title">📊 캠핑장별 다녀온 횟수 <small>총 '+visibleTrips.length+'번 · '+rank.length+'곳'
       + (repeat?(' · 다시 간 곳 '+repeat+'곳'):'') + '</small></div>'
       + '<div class="vs-list">'
       + rank.map(r=>
@@ -2091,6 +2127,8 @@ function renderTrips(){
     saveAlbum();
     if(t.lat){ setMap(t.lat,t.lon,t.place, asCopy?11:12); }
     document.getElementById('campName').value = asCopy ? '' : (t.place||'');
+    tripPickedIds = asCopy ? [] : (Array.isArray(t.memberIds) ? [...t.memberIds] : []);
+    renderTripMemberPicks();
     document.getElementById('placeInput').value = asCopy ? '' : (t.addr || '');
     document.getElementById('tripDate').value = asCopy ? '' : (t.date||'');
     document.getElementById('tripEnd').value = asCopy ? '' : (t.end||'');
@@ -2145,6 +2183,8 @@ document.getElementById('tripSave').onclick=()=>{
             || document.getElementById('placeInput').value.trim()
             || '캠핑'),
     addr: document.getElementById('placeInput').value.trim(),
+    ownerId: currentUser ? currentUser.id : null,
+    memberIds: JSON.parse(JSON.stringify(tripPickedIds)),
     lat: currentPlace.lat, lon: currentPlace.lon,
     date: document.getElementById('tripDate').value,
     end: document.getElementById('tripEnd').value,
@@ -2278,6 +2318,56 @@ let myRole = 'viewer';   // admin(관리자) / member(팀원) / viewer(열람자
 const ROLE_LABEL = { admin:'관리자', member:'팀원', viewer:'열람자' };
 
 /* 내 역할 확인. 없으면 열람자로 자동 등록 */
+/* ---- 캠핑별 참여자 지정 ---- */
+let allAccounts = [];        // [{user_id, email, role}]
+let tripPickedIds = [];      // 이번 캠핑에 함께 간 사람들의 user_id
+
+async function loadAccounts(){
+  if(!sb || !currentUser) return;
+  try{
+    const { data } = await sb.from('camplog_roles').select('user_id,email,role');
+    allAccounts = data || [];
+  }catch(e){ allAccounts = []; }
+}
+
+function renderTripMemberPicks(){
+  const box = document.getElementById('tripMemberPicks');
+  if(!box) return;
+  // 관리자 본인은 항상 볼 수 있으니 목록에서 제외, 열람자도 제외
+  const pickable = allAccounts.filter(a =>
+    a.user_id !== (currentUser && currentUser.id) && a.role !== 'viewer');
+  if(!pickable.length){
+    box.innerHTML = '<span class="mp-empty">아직 함께할 팀원이 없어요. 함께 갈 분이 회원가입하고, 위 ⚙️ 계정 관리에서 <b>팀원</b>으로 바꾸면 여기에 나타나요.</span>';
+    return;
+  }
+  box.innerHTML = pickable.map(a=>
+    '<span class="mp-item'+(tripPickedIds.includes(a.user_id)?' on':'')+'" data-uid="'+a.user_id+'">'
+    + (a.email||'(이름 없음)') + '</span>'
+  ).join('');
+  box.querySelectorAll('.mp-item').forEach(el=>{
+    el.onclick=()=>{
+      if(!canEdit()) return;
+      const uid = el.dataset.uid;
+      if(tripPickedIds.includes(uid)) tripPickedIds = tripPickedIds.filter(x=>x!==uid);
+      else tripPickedIds.push(uid);
+      renderTripMemberPicks();
+    };
+  });
+}
+
+/* 캠핑 목록에는 모두 보인다 (겉 정보) */
+function canSeeTrip(t){ return true; }
+
+/* 이 캠핑의 '속 내용'(누구랑·정산·영수증)까지 볼 수 있는가? */
+function canSeeTripDetail(t){
+  if(isAdmin()) return true;                            // 관리자는 전부
+  if(myRole==='viewer') return false;                   // 열람자는 겉만
+  const uid = currentUser && currentUser.id;
+  if(t.ownerId && t.ownerId === uid) return true;       // 내가 만든 캠핑
+  if(Array.isArray(t.memberIds) && t.memberIds.includes(uid)) return true;  // 내가 참여한 캠핑
+  return false;                                          // 팀원이지만 참여 안 한 캠핑 → 겉만
+}
+
 async function loadMyRole(){
   myRole = 'viewer';
   if(!sb || !currentUser) return;
@@ -2366,8 +2456,10 @@ async function onLoggedIn(user){
   document.getElementById('mainApp').style.display='block';
   document.getElementById('userBarEmail').textContent='👤 '+(user.email||'로그인됨');
   await loadMyRole();    // 내 역할 확인
+  await loadAccounts();  // 함께 쓰는 계정 목록
   await cloudLoad();     // 인터넷 자료 먼저 가져오기
   renderEverything();    // 화면 그리기
+  renderTripMemberPicks();
   applyRoleToScreen();   // 역할에 맞게 잠그기
   if(isAdmin()) renderAdminPanel();
   setTimeout(()=>{ if(map) map.invalidateSize(); }, 200);
@@ -2417,7 +2509,7 @@ document.getElementById('allMapBtn').onclick = function(){
   mapDiv.style.display = 'block';
 
   // 위치(좌표)가 있는 캠핑만 모으기
-  const spots = trips.filter(t=>t.lat && t.lon);
+  const spots = trips.filter(t=>t.lat && t.lon && (typeof canSeeTrip!=='function' || canSeeTrip(t)));
   if(!spots.length){
     note.textContent = '아직 지도에 표시할 캠핑이 없어요. 캠핑을 저장할 때 위쪽 ‘날씨용 위치 표시’를 눌러 위치를 잡아 두면 여기에 핀으로 모여요.';
     if(allMap){ allMapMarkers.forEach(m=>m.remove()); allMapMarkers=[]; }
