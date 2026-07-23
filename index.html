@@ -279,6 +279,12 @@
   .who-summary .ws-item b{color:var(--moss)}
   .who-summary .ws-item.none{border-style:dashed;color:#9c9684}
 
+  .date-echo{
+    background:#fff9ec;border:1px dashed var(--sage);border-radius:10px;
+    padding:10px 13px;font-size:14px;color:var(--bark);margin-bottom:6px;display:none;
+  }
+  .date-echo .de-n{color:var(--ember);font-weight:700;margin-left:6px}
+
   /* ---- 사진 공개/비공개 ---- */
   .album-grid .ac{position:relative}
   .ac-priv{
@@ -380,15 +386,24 @@
   .pin-layer{position:absolute;inset:0;line-height:normal;cursor:crosshair;touch-action:manipulation}
   .pin{
     position:absolute;transform:translate(-50%,-100%);
-    font-size:26px;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));
+    font-size:14px;cursor:pointer;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));
     z-index:2;
   }
   .pin .cap{
-    position:absolute;top:-6px;left:50%;transform:translateX(-50%);
-    background:var(--ember);color:#fff;font-size:11px;font-weight:700;
-    padding:1px 6px;border-radius:999px;white-space:nowrap;
+    position:absolute;top:-4px;left:50%;transform:translateX(-50%);
+    background:var(--ember);color:#fff;font-size:8.5px;font-weight:700;
+    padding:0 4px;border-radius:999px;white-space:nowrap;letter-spacing:-.02em;line-height:1.5;
   }
-  .pin:hover{filter:drop-shadow(0 0 4px var(--ember))}
+  .pin:hover{filter:drop-shadow(0 0 3px var(--ember))}
+  .dp-title{font-size:14px;color:var(--bark);margin-bottom:10px}
+  .deck-no-list{display:flex;flex-wrap:wrap;gap:8px}
+  .dn-row{display:flex;align-items:center;gap:7px;background:#fffdf7;
+    border:1px solid var(--line);border-radius:9px;padding:6px 9px}
+  .dn-pin{
+    background:var(--ember);color:#fff;font-size:11px;font-weight:700;
+    width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  }
+  .dn-input{width:130px;font-size:13.5px;padding:6px 9px}
   .deck-picked{margin-top:14px;font-size:14px;color:var(--bark);
     background:#fff9ec;border:1px dashed var(--sage);border-radius:10px;padding:11px 13px;display:none}
   .deck-picked.show{display:block}
@@ -644,13 +659,24 @@
     <div id="map"></div>
   </section>
 
-  <!-- 2. 날씨 -->
+  <!-- 2. 캠핑 날짜 & 날씨 -->
   <section class="card">
-    <h2><span class="ico">⛅</span> 캠핑장 날씨</h2>
-    <p class="hint">위에서 캠핑장 위치를 표시하면 날씨를 볼 수 있어요. 아래 캠핑 날짜를 넣으면 <b>그날 날씨</b>도 확인해서 기록으로 남겨요. (지난 날짜는 실제 날씨, 앞날은 예보)</p>
+    <h2><span class="ico">📅</span> 캠핑 날짜 & 날씨</h2>
+    <p class="hint">캠핑 날짜를 정하면 <b>그날 날씨</b>를 확인해 기록으로 남길 수 있어요. (지난 날짜는 실제 날씨, 앞날은 예보)</p>
+    <div class="two">
+      <div>
+        <label class="fld" for="tripDate">시작 날짜</label>
+        <input id="tripDate" type="date" />
+      </div>
+      <div>
+        <label class="fld" for="tripEnd">끝나는 날짜</label>
+        <input id="tripEnd" type="date" />
+      </div>
+    </div>
+    <div id="nightsLabel" style="font-size:13.5px;color:var(--ember);font-weight:600;margin-top:8px"></div>
     <div class="btn-row">
-      <button class="btn btn-ember" id="wxBtn">앞으로 7일 날씨 보기</button>
-      <button class="btn btn-ghost" id="wxDayBtn">캠핑 날짜의 날씨 기록하기</button>
+      <button class="btn btn-ember" id="wxDayBtn">이 날짜의 날씨 기록하기</button>
+      <button class="btn btn-ghost" id="wxBtn">앞으로 7일 날씨 보기</button>
     </div>
     <div class="wx-day-box" id="wxDayBox"></div>
     <div class="wx-grid" id="wxGrid"></div>
@@ -699,7 +725,12 @@
   <!-- 5. 데크 배치도 (사진) -->
   <section class="card">
     <h2><span class="ico">🗺️</span> 데크 배치도</h2>
-    <p class="hint">캠핑장 배치도 사진을 올리고, 예약한 자리를 사진 위에서 톡 누르면 텐트 핀이 꽂혀요. 자리를 여러 개 찍을 수도 있어요.</p>
+    <p class="hint">배치도 사진을 올리고 예약한 자리를 톡 누르면 핀이 꽂혀요. 아래에 <b>데크 번호</b>를 미리 적어두면 핀에 그 번호가 붙어요.</p>
+    <label class="fld" for="deckNoInput">데크 번호 <span style="color:var(--moss);font-weight:400">(적어두고 사진을 누르면 이 번호로 꽂혀요)</span></label>
+    <div class="add-row">
+      <input id="deckNoInput" placeholder="예) A-12, 15번" />
+      <button class="btn btn-ghost" id="deckNoClear">비우기</button>
+    </div>
     <div class="btn-row">
       <label class="btn btn-main" for="deckImgInput" style="display:inline-block">배치도 사진 올리기</label>
       <input id="deckImgInput" type="file" accept="image/*" style="display:none" />
@@ -709,7 +740,7 @@
     </div>
     <div class="deck-legend">
       <span>⛺ 눌러서 찍은 내 자리</span>
-      <span>핀을 누르면 그 핀만 지워져요</span>
+      <span>핀을 누르면 번호를 고치거나 지울 수 있어요</span>
     </div>
     <div class="deck-stage" id="deckStage">
       <div class="deck-empty" id="deckEmpty">아직 배치도 사진이 없어요.<br>‘배치도 사진 올리기’를 눌러 캠핑장 배치도를 올려 주세요.</div>
@@ -796,18 +827,8 @@
   <!-- 7. 이 캠핑 저장 -->
   <section class="card">
     <h2><span class="ico">📌</span> 이 캠핑 저장하기</h2>
-    <p class="hint">날짜와 함께 저장하면 아래 목록에 남아요. 앱을 껐다 켜도 그대로 있어요.</p>
-    <div class="two">
-      <div>
-        <label class="fld" for="tripDate">시작 날짜</label>
-        <input id="tripDate" type="date" />
-      </div>
-      <div>
-        <label class="fld" for="tripEnd">끝나는 날짜</label>
-        <input id="tripEnd" type="date" />
-      </div>
-    </div>
-    <div id="nightsLabel" style="font-size:13.5px;color:var(--ember);font-weight:600;margin-top:8px"></div>
+    <p class="hint">날짜는 위 <b>캠핑 날짜</b> 칸에서 정해요. 여기서 나머지를 채우고 저장하면 목록에 남아요.</p>
+    <div id="dateEcho" class="date-echo"></div>
     <label class="fld" for="tripWith">누구랑 / 메모</label>
     <input id="tripWith" placeholder="예) 가족과 함께" />
 
@@ -1647,17 +1668,19 @@ function showDeck(){
 
 function renderPins(){
   const layer = document.getElementById('pinLayer');
+  // 배치도 위에는 위치만 표시 (번호는 아래 목록에서 관리)
   layer.innerHTML = pins.map((p,i)=>
-    '<div class="pin" data-i="'+i+'" style="left:'+(p.x*100)+'%;top:'+(p.y*100)+'%">'
+    '<div class="pin" data-i="'+i+'" style="left:'+(p.x*100)+'%;top:'+(p.y*100)+'%" title="'+((p.no||'').trim()||('핀 '+(i+1)))+'">'
     +'<span class="cap">'+(i+1)+'</span>⛺</div>'
   ).join('');
-  // 핀을 누르면 그 핀 삭제
   layer.querySelectorAll('.pin').forEach(pin=>{
     const handler=(e)=>{
-      e.stopPropagation();      // 빈 곳 클릭(새 핀)으로 번지지 않게
+      e.stopPropagation();
       e.preventDefault();
-      if(confirm((parseInt(pin.dataset.i)+1)+'번 핀을 지울까요?')){
-        pins.splice(pin.dataset.i,1); saveDeck(); renderPins(); renderDeckPicked();
+      if(typeof canEdit==='function' && !canEdit()) return;
+      const i = parseInt(pin.dataset.i);
+      if(confirm('이 핀을 지울까요?')){
+        pins.splice(i,1); saveDeck(); renderPins(); renderDeckPicked();
       }
     };
     pin.addEventListener('click', handler);
@@ -1667,10 +1690,25 @@ function renderDeckPicked(){
   const el = document.getElementById('deckPicked');
   if(deckImg && pins.length){
     el.classList.add('show');
-    el.innerHTML = '찍은 자리: <b>'+pins.length+'곳</b> ⛺ · 핀을 누르면 지울 수 있어요.';
+    el.innerHTML = '<div class="dp-title">⛺ 찍은 자리 <b>'+pins.length+'곳</b> · 아래 칸에 데크 번호를 적어 주세요</div>'
+      + '<div class="deck-no-list">'
+      + pins.map((p,i)=>
+          '<div class="dn-row">'
+          + '<span class="dn-pin">'+(i+1)+'</span>'
+          + '<input class="dn-input" data-no="'+i+'" value="'+String(p.no||'').replace(/"/g,'&quot;')+'" placeholder="데크 번호 (예: A-12)">'
+          + '</div>'
+        ).join('')
+      + '</div>'
+      + '<div style="font-size:12.5px;color:var(--moss);margin-top:8px">배치도 위 핀은 위치만 표시해요. 핀을 누르면 지울 수 있어요.</div>';
+
+    // 번호 입력 저장
+    el.querySelectorAll('.dn-input').forEach(inp=>{
+      if(typeof canEdit==='function' && !canEdit()){ inp.disabled = true; }
+      inp.oninput=()=>{ pins[inp.dataset.no].no = inp.value; saveDeck(); };
+    });
   }else if(deckImg){
     el.classList.add('show');
-    el.innerHTML = '사진 위에서 예약한 자리를 눌러 핀을 찍어 주세요.';
+    el.innerHTML = '사진 위에서 예약한 자리를 눌러 핀을 찍어 주세요. 핀을 찍으면 여기에 데크 번호를 적는 칸이 생겨요.';
   }else{
     el.classList.remove('show');
     el.innerHTML='';
@@ -1709,7 +1747,10 @@ document.getElementById('deckImgInput').addEventListener('change', async functio
     let x = (clientX - rect.left) / rect.width;
     let y = (clientY - rect.top) / rect.height;
     if(x<0||x>1||y<0||y>1) return;
-    pins.push({x, y});
+    // 위에 적어둔 데크 번호가 있으면 그 번호로 꽂는다
+    const noEl = document.getElementById('deckNoInput');
+    const no = noEl ? noEl.value.trim() : '';
+    pins.push({x, y, no});
     saveDeck(); renderPins(); renderDeckPicked();
   }
 
@@ -2258,12 +2299,20 @@ function renderTrips(){
     const visitBadge = (total > 1)
       ? '<span class="visit-badge" title="이 캠핑장 '+total+'번 중 '+nth+'번째">'+nth+'번째</span>'
       : '';
+    // 데크: 번호가 적혀 있으면 번호를, 없으면 개수를 보여준다
+    let deckTxt = '';
+    if(t.deckPins && t.deckPins.length){
+      const nos = t.deckPins.map(p=>String(p.no||'').trim()).filter(n=>n);
+      deckTxt = nos.length
+        ? (' · 데크 <b style="color:#c96f3f">'+nos.join(', ')+'</b> ⛺')
+        : (' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>');
+    }
     // 내가 함께 간 캠핑이면 표시
     const joinBadge = (detail && !isAdmin() && myRole==='member')
       ? '<span class="join-badge">함께 간 캠핑</span>' : '';
     return '<div class="trip'+(detail?'':' trip-dim')+'"><div class="th"><b>'+(t.place||'캠핑')+visitBadge+joinBadge+'</b><span class="when">'+fmt(t)+'</span></div>'
       +(t.addr && t.addr!==t.place ? '<div style="font-size:12.5px;color:#9c9684;margin-top:2px">📍 '+t.addr+'</div>' : '')
-      +'<div class="meta">'+withHtml+nights+wxTxt+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
+      +'<div class="meta">'+withHtml+nights+wxTxt+deckTxt+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
       +'<div class="tbtns">'
       + (detail ? '<button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>' : '')
       + (canEdit() ? '<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>' : '')
@@ -2447,6 +2496,21 @@ function nightsText(startV, endV){
 function updateNights(){
   document.getElementById('nightsLabel').textContent =
     nightsText(document.getElementById('tripDate').value, document.getElementById('tripEnd').value);
+  // 저장 칸에도 날짜를 다시 보여준다
+  const echo = document.getElementById('dateEcho');
+  if(echo){
+    const s = document.getElementById('tripDate').value;
+    const e = document.getElementById('tripEnd').value;
+    if(s){
+      const n = nightsTextGlobal(s, e);
+      echo.innerHTML = '📅 <b>'+s+'</b>'+(e&&e!==s?(' ~ <b>'+e+'</b>'):'')
+        + (n?(' <span class="de-n">'+n+'</span>'):'');
+      echo.style.display='block';
+    }else{
+      echo.innerHTML = '📅 날짜가 아직 없어요. 위 <b>캠핑 날짜 &amp; 날씨</b> 칸에서 정해 주세요.';
+      echo.style.display='block';
+    }
+  }
 }
 document.getElementById('tripDate').addEventListener('change', updateNights);
 document.getElementById('tripEnd').addEventListener('change', updateNights);
@@ -2482,7 +2546,7 @@ function renderEverything(){
   document.getElementById('campName').value = store.get('camp_name','') || '';
   renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShopTools(); renderShop(); renderTrips();
   showDeck();
-  renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum(); renderCurrentTripBar();
+  renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum(); renderCurrentTripBar(); updateNights();
   updateMapLinks();
 }
 
