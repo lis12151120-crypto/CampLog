@@ -279,6 +279,18 @@
   .who-summary .ws-item b{color:var(--moss)}
   .who-summary .ws-item.none{border-style:dashed;color:#9c9684}
 
+  /* ---- 이번 캠핑 제외 표시 ---- */
+  .off-tag{
+    font-size:11px;padding:3px 8px;border-radius:999px;cursor:pointer;white-space:nowrap;
+    border:1px solid var(--line);color:#b6ab90;background:transparent;flex:0 0 auto;
+  }
+  .off-tag.on{background:#d9d0bb;color:#6f6a58;border-color:#c8bfa8;font-weight:700}
+  .off-tag:hover{filter:brightness(.96)}
+  li.item-off{opacity:.5}
+  li.item-off .txt, li.item-off span{text-decoration:line-through}
+  li.item-off .off-tag{text-decoration:none}
+  body.role-viewer .off-tag{cursor:default;opacity:.7}
+
   /* ---- 담당자 표시 ---- */
   .who-tag{
     font-size:11.5px;padding:3px 9px;border-radius:999px;cursor:pointer;white-space:nowrap;
@@ -1252,6 +1264,7 @@ function renderWhoSummary(){
   const byWho = {};
   let noneCnt = 0;
   checklistData.forEach(i=>{
+    if(i.off) return;                    // 제외한 건 세지 않음
     const w = (i.who||'').trim();
     if(!w){ noneCnt++; return; }
     if(!byWho[w]) byWho[w] = {total:0, done:0};
@@ -1279,11 +1292,14 @@ function renderChecklist(){
   function itemLi(i){
     const idx = checklistData.indexOf(i);
     const who = i.who ? i.who : '';
-    return '<li class="'+(i.done?'done':'')+'">'
-      +'<input type="checkbox" data-i="'+idx+'" '+(i.done?'checked':'')+'>'
+    const off = !!i.off;                       // 이번 캠핑에서 제외
+    return '<li class="'+(i.done?'done':'')+(off?' item-off':'')+'">'
+      +'<input type="checkbox" data-i="'+idx+'" '+(i.done?'checked':'')+(off?' disabled':'')+'>'
       +'<span class="txt">'+i.txt+'</span>'
-      +'<span class="who-tag'+(who?' has':'')+'" data-who="'+idx+'" title="누르면 담당자를 정할 수 있어요">'
-        +(who ? '🙋 '+who : '＋담당')
+      +(off ? '' : '<span class="who-tag'+(who?' has':'')+'" data-who="'+idx+'" title="누르면 담당자를 정할 수 있어요">'
+        +(who ? '🙋 '+who : '＋담당') + '</span>')
+      +'<span class="off-tag'+(off?' on':'')+'" data-off="'+idx+'" title="'+(off?'다시 포함하기':'이번 캠핑에서 제외')+'">'
+        +(off ? '제외됨' : '제외')
       +'</span>'
       +'<button class="del" data-d="'+idx+'">×</button></li>';
   }
@@ -1291,9 +1307,10 @@ function renderChecklist(){
   const cats = [...new Set(checklistData.map(i=>i.cat))].sort((a,b)=>catRank(a)-catRank(b));
   ul.innerHTML = cats.map(cat=>{
     const items = checklistData.filter(i=>i.cat===cat);
-    const doneN = items.filter(i=>i.done).length;
+    const activeItems = items.filter(i=>!i.off);
+    const doneN = activeItems.filter(i=>i.done).length;
     const isOpen = !!openCats[cat];
-    const head = '<li class="chk-head" data-cat="'+cat+'"><span class="arw">'+(isOpen?'▼':'▶')+'</span> '+cat+' <span class="cnt">'+doneN+'/'+items.length+'</span></li>';
+    const head = '<li class="chk-head" data-cat="'+cat+'"><span class="arw">'+(isOpen?'▼':'▶')+'</span> '+cat+' <span class="cnt">'+doneN+'/'+activeItems.length+'</span></li>';
     const body = isOpen ? items.map(itemLi).join('') : '';
     return head + body;
   }).join('');
@@ -1325,14 +1342,28 @@ function renderChecklist(){
       saveChecklist(); renderChecklist();
     };
   });
+  // 이번 캠핑에서 제외 / 다시 포함
+  ul.querySelectorAll('.off-tag').forEach(el=>{
+    el.onclick=(e)=>{
+      e.stopPropagation();
+      if(typeof canEdit==='function' && !canEdit()) return;
+      const idx = el.dataset.off;
+      checklistData[idx].off = !checklistData[idx].off;
+      if(checklistData[idx].off) checklistData[idx].done = false;  // 제외하면 체크 해제
+      saveChecklist(); renderChecklist();
+    };
+  });
   updateProgress();
 }
 function updateProgress(){
-  const total = checklistData.length;
-  const done = checklistData.filter(i=>i.done).length;
+  const active = checklistData.filter(i=>!i.off);   // 제외한 건 빼고 계산
+  const total = active.length;
+  const done = active.filter(i=>i.done).length;
+  const offN = checklistData.length - total;
   const pct = total? Math.round(done/total*100):0;
   document.getElementById('progBar').style.width = pct+'%';
-  document.getElementById('progLabel').textContent = total+'개 중 '+done+'개 챙김 ('+pct+'%)';
+  document.getElementById('progLabel').textContent =
+    total+'개 중 '+done+'개 챙김 ('+pct+'%)' + (offN ? ' · 제외 '+offN+'개' : '');
 }
 function fillChkCatSel(){
   const sel=document.getElementById('chkCatSel');
@@ -1479,20 +1510,22 @@ function renderShop(){
   function itemLi(s){
     const idx=shopData.indexOf(s);
     const who = s.who ? s.who : '';
-    return '<li class="'+(s.got?'got':'')+'">'
-      +'<input type="checkbox" data-i="'+idx+'" '+(s.got?'checked':'')+'>'
+    const off = !!s.off;
+    return '<li class="'+(s.got?'got':'')+(off?' item-off':'')+'">'
+      +'<input type="checkbox" data-i="'+idx+'" '+(s.got?'checked':'')+(off?' disabled':'')+'>'
       +'<span>'+s.txt+'</span>'
-      +'<span class="who-tag'+(who?' has':'')+'" data-who="'+idx+'" title="누르면 담당자를 정할 수 있어요">'
-        +(who ? '🙋 '+who : '＋담당')
-      +'</span>'
+      +(off ? '' : '<span class="who-tag'+(who?' has':'')+'" data-who="'+idx+'" title="누르면 담당자를 정할 수 있어요">'
+        +(who ? '🙋 '+who : '＋담당') + '</span>')
+      +'<span class="off-tag'+(off?' on':'')+'" data-off="'+idx+'">'+(off?'제외됨':'제외')+'</span>'
       +'<button class="del" data-d="'+idx+'">×</button></li>';
   }
   const cats=[...new Set(shopData.map(s=>s.cat||'기타'))].sort((a,b)=>shopRank(a)-shopRank(b));
   ul.innerHTML = cats.map(cat=>{
     const items=shopData.filter(s=>(s.cat||'기타')===cat);
-    const gotN=items.filter(s=>s.got).length;
+    const activeItems=items.filter(s=>!s.off);
+    const gotN=activeItems.filter(s=>s.got).length;
     const isOpen=!!openShopCats[cat];
-    const head='<li class="chk-head" data-cat="'+cat+'"><span class="arw">'+(isOpen?'▼':'▶')+'</span> '+cat+' <span class="cnt">'+gotN+'/'+items.length+'</span></li>';
+    const head='<li class="chk-head" data-cat="'+cat+'"><span class="arw">'+(isOpen?'▼':'▶')+'</span> '+cat+' <span class="cnt">'+gotN+'/'+activeItems.length+'</span></li>';
     return head + (isOpen ? items.map(itemLi).join('') : '');
   }).join('');
   ul.querySelectorAll('.chk-head').forEach(h=>{
@@ -1513,6 +1546,16 @@ function renderShop(){
       const v = prompt('이건 누가 사올까요?\n(비우고 확인하면 담당자가 지워져요)', now);
       if(v===null) return;
       shopData[idx].who = v.trim();
+      saveShop(); renderShop();
+    };
+  });
+  ul.querySelectorAll('.off-tag').forEach(el=>{
+    el.onclick=(e)=>{
+      e.stopPropagation();
+      if(typeof canEdit==='function' && !canEdit()) return;
+      const idx = el.dataset.off;
+      shopData[idx].off = !shopData[idx].off;
+      if(shopData[idx].off) shopData[idx].got = false;
       saveShop(); renderShop();
     };
   });
@@ -2511,7 +2554,7 @@ function startNewTrip(){
   store.set('camp_current_trip', null);
   // 준비물은 기본 목록으로 새로 시작
   checklistData = [];
-  defaultChecklist.forEach(g => g.items.forEach(it => checklistData.push({cat:g.cat, txt:it, done:false, who:''})));
+  defaultChecklist.forEach(g => g.items.forEach(it => checklistData.push({cat:g.cat, txt:it, done:false, who:'', off:false})));
   saveChecklist();
   shopData = []; saveShop();
   members = []; expenses = []; saveSplit();
