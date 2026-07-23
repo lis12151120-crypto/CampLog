@@ -221,6 +221,29 @@
   }
   .trip .th{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .trip .th b{font-size:16px;color:var(--bark)}
+  /* ---- 캠핑장별 방문 횟수 ---- */
+  .visit-summary{
+    background:linear-gradient(135deg,#fff9ec,#f1ead8);
+    border:1px solid var(--line);border-radius:12px;
+    padding:14px 15px;margin-bottom:14px;
+  }
+  .vs-title{font-family:Georgia,"Nanum Myeongjo",serif;font-size:15px;color:var(--bark);font-weight:700;
+    display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .vs-title small{font-size:12px;color:var(--moss);font-weight:400}
+  .vs-list{display:flex;flex-wrap:wrap;gap:7px}
+  .vs-item{
+    background:#fffdf7;border:1px solid var(--line);border-radius:999px;
+    padding:6px 12px;font-size:13.5px;color:var(--bark);
+  }
+  .vs-item b{color:var(--moss);margin-left:3px}
+  .vs-item.many{background:var(--ember);border-color:var(--ember);color:#fff}
+  .vs-item.many b{color:#ffe6d6}
+  .visit-badge{
+    display:inline-block;background:var(--ember);color:#fff;
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;
+    margin-left:7px;vertical-align:middle;
+  }
+
   .trip-group{margin-top:16px}
   .trip-group:first-child{margin-top:6px}
   .group-title{
@@ -500,9 +523,11 @@
   <!-- 1. 캠핑장 위치 -->
   <section class="card">
     <h2><span class="ico">🏕️</span> 캠핑장 위치</h2>
-    <p class="hint">캠핑장 이름을 적고 아래 지도 버튼을 누르면 카카오맵·네이버지도에서 열려요. ‘날씨용 위치 표시’를 누르면 아래 작은 지도와 날씨에 쓸 위치가 잡혀요.</p>
-    <label class="fld" for="placeInput">캠핑장 이름 또는 지역</label>
-    <input id="placeInput" placeholder="예) 가평 자라섬 오토캠핑장" />
+    <p class="hint"><b>캠핑장 이름</b>은 기록에 남을 이름이에요. <b>주소</b>는 지도에서 위치를 찾을 때 써요. 이름만 넣어도 되고, 위치를 정확히 잡고 싶으면 주소도 넣으세요.</p>
+    <label class="fld" for="campName">캠핑장 이름 <span style="color:var(--ember)">(기록에 남아요)</span></label>
+    <input id="campName" placeholder="예) 산장관광지 오토캠핑장" />
+    <label class="fld" for="placeInput">주소 또는 지역 <span style="color:var(--moss)">(지도 검색용)</span></label>
+    <input id="placeInput" placeholder="예) 덕현산장길 71 / 가평 자라섬" />
     <div class="ext-map-btns" id="extMapBtns">
       <a class="ext-map kakao" id="openKakao" target="_blank" rel="noopener">🗺️ 카카오맵에서 보기</a>
       <a class="ext-map naver" id="openNaver" target="_blank" rel="noopener">🧭 네이버지도에서 보기</a>
@@ -543,7 +568,7 @@
     <div class="file-import">
       <label class="imp-btn" for="chkFile">엑셀·CSV 올리기</label>
       <input id="chkFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
-      <span class="imp-help">엑셀 <b>첫 칸에 준비물 이름</b>, 둘째 칸에 분류(선택). 한 줄에 하나씩. 올리면 목록에 더해져요.</span>
+      <span class="imp-help">엑셀에 <b>물건 이름</b>을 한 줄에 하나씩. 번호 칸이 있어도 알아서 걸러요. 분류 칸(침실용품·주방용품 등)이 있으면 그대로 쓰고, 없으면 이름을 보고 자동으로 나눠요.</span>
     </div>
   </section>
 
@@ -551,6 +576,7 @@
   <section class="card">
     <h2><span class="ico">🛒</span> 장보기 메모</h2>
     <p class="hint">마트에서 살 것들을 적어 두세요. 담은 물건은 체크하면 줄이 그어져요.</p>
+    <div class="chk-cats" id="shopTools"></div>
     <ul class="shop" id="shopList"></ul>
     <div class="add-row">
       <select id="shopCatSel" style="flex:0 0 auto;width:auto"></select>
@@ -560,7 +586,7 @@
     <div class="file-import">
       <label class="imp-btn" for="shopFile">엑셀·CSV 올리기</label>
       <input id="shopFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" />
-      <span class="imp-help">엑셀 <b>첫 칸에 살 것</b>을 한 줄에 하나씩. 올리면 목록에 더해져요.</span>
+      <span class="imp-help">엑셀에 <b>살 것</b>을 한 줄에 하나씩. 번호 칸이 있어도 알아서 걸러요.</span>
     </div>
   </section>
 
@@ -573,6 +599,7 @@
       <input id="deckImgInput" type="file" accept="image/*" style="display:none" />
       <button class="btn btn-ghost" id="deckUndo">마지막 핀 지우기</button>
       <button class="btn btn-ghost" id="deckClearAll">핀 전부 지우기</button>
+      <button class="btn btn-ghost" id="deckDelImg" style="color:var(--ember);border-color:var(--ember)">🗑️ 배치도 사진 삭제</button>
     </div>
     <div class="deck-legend">
       <span>⛺ 눌러서 찍은 내 자리</span>
@@ -706,7 +733,7 @@ const SB_KEY = 'sb_publishable_a6NeiZodJWxkDjt-_Wuiow_AT2OmYjX';
 let sb = null;
 let currentUser = null;
 // CampLog가 쓰는 저장 칸 이름들 (이 값들을 통째로 인터넷에 올린다)
-const CAMP_KEYS = ['camp_checklist','camp_shop','camp_deck_img','camp_deck_img_path','camp_deck_pins','camp_album',
+const CAMP_KEYS = ['camp_name','camp_checklist','camp_shop','camp_deck_img','camp_deck_img_path','camp_deck_pins','camp_album',
   'camp_members','camp_expenses','camp_receipts','camp_settlefiles','camp_trips','camp_place'];
 
 function collectAllData(){
@@ -830,6 +857,9 @@ function updateMapLinks(){
   document.getElementById('openNaver').href = 'https://map.naver.com/p/search/'+enc;
 }
 document.getElementById('placeInput').addEventListener('input', updateMapLinks);
+document.getElementById('campName').addEventListener('input', function(){
+  store.set('camp_name', this.value);
+});
 
 /* ================= 날씨 (Open-Meteo, 무료·키 불필요) ================= */
 const wxEmoji = code => {
@@ -1018,6 +1048,82 @@ const defaultChecklist = [
 ];
 // 분류 표시 순서 (자동 정렬용)
 const catOrder = ['침실용품','주방용품','식자재','생활용품','불·조명','옷','기타'];
+
+/* 옛 분류명 → 새 분류명 통일 */
+function normalizeCat(c){
+  const s=String(c||'').trim();
+  const map = {'잠자리':'침실용품','주방':'주방용품','생활':'생활용품','침구':'침실용품','취사':'주방용품','음식':'식자재'};
+  if(map[s]) return map[s];
+  return catOrder.includes(s) ? s : (s||'기타');
+}
+
+/* 물건 이름으로 분류를 자동 추측 (정리 버튼에서 사용) */
+function guessItemCat(txt){
+  const t=String(txt||'');
+  const fire=['화로','장작','숯','토치','라이터','랜턴','손전등','건전지','조명','스피커','멀티탭','전기','파워뱅크','배터리'];
+  const bed=['텐트','타프','그라운드','폴대','팩','망치','침낭','매트','베개','에어펌프','이너','쉘터'];
+  const kit=['버너','부탄','코펠','냄비','수저','젓가락','접시','컵','잔','칼','도마','집게','물통','아이스박스','수세미','세제','키친','후라이팬','팬','그릴','주전자','보온병','텀블러'];
+  const life=['의자','테이블','돗자리','물티슈','휴지','수건','비상약','벌레','모기','쓰레기','충전기','우산','빗자루','매트리스'];
+  const food=['쌀','햇반','고기','삼겹','목살','채소','상추','양파','마늘','대파','버섯','김치','라면','과자','간식','빵','우유','계란','달걀','소시지','두부','과일','고추','소금','후추','기름','양념','소스','음료','맥주','소주','와인','커피'];
+  const cloth=['옷','겉옷','양말','모자','우비','슬리퍼','장갑','바지','티셔츠','패딩'];
+  // 조명·전기 계열을 가장 먼저 (랜턴(텐트형) 같은 경우 대비)
+  if(fire.some(k=>t.includes(k))) return '불·조명';
+  if(bed.some(k=>t.includes(k))) return '침실용품';
+  if(kit.some(k=>t.includes(k))) return '주방용품';
+  if(cloth.some(k=>t.includes(k))) return '옷';
+  if(food.some(k=>t.includes(k))) return '식자재';
+  if(life.some(k=>t.includes(k))) return '생활용품';
+  if(/물|얼음|ml|리터|생수/i.test(t)) return '식자재';
+  return '기타';
+}
+
+/* 이름 앞에 붙은 번호·기호 떼어내기  예) "27. 타프" → "타프" */
+function cleanItemName(txt){
+  let s = String(txt||'').trim();
+  s = s.replace(/^\s*\d+\s*[.)\-–·]\s*/, '');   // 27. / 27) / 27- 형태
+  s = s.replace(/^\s*[-•*]\s*/, '');            // 앞 기호
+  s = s.replace(/\s{2,}/g, ' ').trim();         // 겹친 공백 정리
+  return s || String(txt||'').trim();
+}
+
+/* 엉킨 준비물 목록 자동 정리 */
+function tidyChecklist(){
+  if(!checklistData.length){ alert('정리할 준비물이 없어요.'); return; }
+  if(!confirm('준비물을 자동으로 정리할까요?\n\n· 이름 앞 번호(27. 등)를 떼어내요\n· 물건 이름을 보고 알맞은 칸으로 옮겨요\n· 똑같은 물건이 두 번 있으면 하나로 합쳐요\n\n체크해 둔 표시는 그대로 남아요.')) return;
+
+  let renamed=0, moved=0, removed=0;
+  // 1) 이름 정리 + 분류 다시 판단
+  checklistData.forEach(it=>{
+    const oldName = it.txt;
+    it.txt = cleanItemName(it.txt);
+    if(oldName !== it.txt) renamed++;
+
+    const before = it.cat;
+    let c = normalizeCat(it.cat);
+    if(!catOrder.includes(c) || c==='기타'){ c = guessItemCat(it.txt); }
+    it.cat = c;
+    if(before !== c) moved++;
+  });
+
+  // 2) 이름이 같은 항목은 하나로 합치기 (체크된 게 있으면 체크 유지)
+  const seen = {};
+  const merged = [];
+  checklistData.forEach(it=>{
+    const key = it.txt.replace(/\s/g,'');
+    if(!key) return;
+    if(seen[key]){
+      if(it.done) seen[key].done = true;
+      removed++;
+    }else{
+      seen[key] = it;
+      merged.push(it);
+    }
+  });
+  checklistData = merged;
+
+  saveChecklist(); renderCats(); fillChkCatSel(); renderChecklist();
+  alert('정리했어요!\n\n· 번호 뗀 항목: '+renamed+'개\n· 칸을 옮긴 항목: '+moved+'개\n· 중복 합친 항목: '+removed+'개');
+}
 let checklistData = store.get('camp_checklist', null);
 let activeCat = '전체';
 
@@ -1031,11 +1137,13 @@ function saveChecklist(){ store.set('camp_checklist', checklistData); }
 function renderCats(){
   const box = document.getElementById('chkCats');
   box.innerHTML = '<button class="chk-cat" id="chkOpenAll">모두 펼치기</button>'
-    + '<button class="chk-cat" id="chkCloseAll">모두 접기</button>';
+    + '<button class="chk-cat" id="chkCloseAll">모두 접기</button>'
+    + '<button class="chk-cat" id="chkTidy" style="background:var(--ember);color:#fff;border-color:var(--ember)">🧹 분류 자동 정리</button>';
   document.getElementById('chkOpenAll').onclick=()=>{
     [...new Set(checklistData.map(i=>i.cat))].forEach(c=>openCats[c]=true); renderChecklist();
   };
   document.getElementById('chkCloseAll').onclick=()=>{ openCats={}; renderChecklist(); };
+  document.getElementById('chkTidy').onclick=tidyChecklist;
 }
 function catRank(c){ const i=catOrder.indexOf(c); return i<0?catOrder.length:i; }
 let openCats = {};  // 어떤 분류가 펼쳐졌는지 기억
@@ -1096,19 +1204,53 @@ document.getElementById('chkAdd').onclick=()=>{
   saveChecklist(); inp.value=''; renderCats(); fillChkCatSel(); renderChecklist();
 };
 document.getElementById('chkInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('chkAdd').click(); });
+/* 우리가 아는 분류 이름인지 판단 */
+function isKnownCat(v){
+  const s=String(v||'').trim();
+  if(!s) return false;
+  if(catOrder.includes(s)) return true;
+  // 옛 이름도 인정
+  return ['잠자리','주방','생활','불·조명','옷','식자재','기타'].includes(s);
+}
+/* 번호만 있는 칸인지 (1, 2, 27, "27." 등) */
+function isNumberCell(v){
+  const s=String(v||'').trim();
+  return s!=='' && /^\d+[.)]?$/.test(s);
+}
+
 document.getElementById('chkFile').addEventListener('change', function(){
   const file=this.files[0]; if(!file) return;
   readSheet(file, rows=>{
     let added=0;
     rows.forEach((r,idx)=>{
-      const name=String(r[0]||'').trim();
+      // 빈 칸 정리
+      const cells = (r||[]).map(c=>String(c==null?'':c).trim());
+      if(!cells.some(c=>c!=='')) return;
+
+      // 1) 분류로 보이는 칸을 찾는다
+      let cat = '기타';
+      let catIdx = -1;
+      cells.forEach((c,i)=>{ if(catIdx<0 && isKnownCat(c)){ cat=c; catIdx=i; } });
+
+      // 2) 물건 이름: 번호칸·분류칸을 뺀 첫 글자 칸
+      let name = '';
+      for(let i=0;i<cells.length;i++){
+        if(i===catIdx) continue;
+        if(isNumberCell(cells[i])) continue;   // 번호만 있는 칸 건너뛰기
+        if(cells[i]!==''){ name = cells[i]; break; }
+      }
       if(!name) return;
-      if(idx===0 && looksLikeHeader(name)) return;
-      const cat=String(r[1]||'').trim()||'기타';
+      if(idx===0 && looksLikeHeader(name)) return;   // 제목 줄 건너뛰기
+      name = cleanItemName(name);                     // 앞 번호 떼어내기
+      if(!name) return;
+
+      // 옛 분류 이름은 새 이름으로 바꾸고, 분류가 없으면 이름으로 추측
+      cat = normalizeCat(cat);
+      if(catIdx < 0 || cat==='기타'){ cat = guessItemCat(name); }
       checklistData.push({cat, txt:name, done:false});
       added++;
     });
-    saveChecklist(); renderCats(); renderChecklist();
+    saveChecklist(); renderCats(); fillChkCatSel(); renderChecklist();
     alert(added+'개의 준비물을 목록에 넣었어요.');
   });
   this.value='';
@@ -1144,6 +1286,48 @@ function fillShopCatSel(){
   sel.innerHTML='<option value="">자동 분류</option>'+shopCatOrder.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
 }
 function shopRank(c){ const i=shopCatOrder.indexOf(c); return i<0?shopCatOrder.length:i; }
+
+/* 장보기 도구 버튼 */
+function renderShopTools(){
+  const box=document.getElementById('shopTools');
+  box.innerHTML = '<button class="chk-cat" id="shopOpenAll">모두 펼치기</button>'
+    + '<button class="chk-cat" id="shopCloseAll">모두 접기</button>'
+    + '<button class="chk-cat" id="shopTidy" style="background:var(--ember);color:#fff;border-color:var(--ember)">🧹 목록 정리</button>';
+  document.getElementById('shopOpenAll').onclick=()=>{
+    [...new Set(shopData.map(s=>s.cat||'기타'))].forEach(c=>openShopCats[c]=true); renderShop();
+  };
+  document.getElementById('shopCloseAll').onclick=()=>{ openShopCats={}; renderShop(); };
+  document.getElementById('shopTidy').onclick=tidyShop;
+}
+
+/* 장보기 목록 자동 정리 */
+function tidyShop(){
+  if(!shopData.length){ alert('정리할 장보기 목록이 없어요.'); return; }
+  if(!confirm('장보기 목록을 자동으로 정리할까요?\n\n· 이름 앞 번호(3. 등)를 떼어내요\n· 이름을 보고 알맞은 칸으로 옮겨요\n· 똑같은 항목은 하나로 합쳐요\n\n담은 표시는 그대로 남아요.')) return;
+
+  let renamed=0, moved=0, removed=0;
+  shopData.forEach(s=>{
+    const oldName=s.txt;
+    s.txt = cleanItemName(s.txt);
+    if(oldName!==s.txt) renamed++;
+    const before = s.cat||'';
+    const c = guessShopCat(s.txt);
+    if(!shopCatOrder.includes(s.cat) || s.cat==='기타' || !s.cat){ s.cat = c; }
+    if(before !== s.cat) moved++;
+  });
+
+  const seen={}, merged=[];
+  shopData.forEach(s=>{
+    const key=s.txt.replace(/\s/g,'');
+    if(!key) return;
+    if(seen[key]){ if(s.got) seen[key].got=true; removed++; }
+    else { seen[key]=s; merged.push(s); }
+  });
+  shopData = merged;
+
+  saveShop(); renderShop(); renderShopTools();
+  alert('정리했어요!\n\n· 번호 뗀 항목: '+renamed+'개\n· 칸을 옮긴 항목: '+moved+'개\n· 중복 합친 항목: '+removed+'개');
+}
 
 let openShopCats = {};
 function renderShop(){
@@ -1187,13 +1371,22 @@ document.getElementById('shopFile').addEventListener('change', function(){
   readSheet(file, rows=>{
     let added=0;
     rows.forEach((r,idx)=>{
-      const txt=String(r[0]||'').trim();
+      const cells=(r||[]).map(c=>String(c==null?'':c).trim());
+      if(!cells.some(c=>c!=='')) return;
+      // 번호만 있는 칸은 건너뛰고 첫 글자 칸을 이름으로
+      let txt='';
+      for(let i=0;i<cells.length;i++){
+        if(isNumberCell(cells[i])) continue;
+        if(cells[i]!==''){ txt=cells[i]; break; }
+      }
       if(!txt) return;
       if(idx===0 && looksLikeHeader(txt)) return;
+      txt = cleanItemName(txt);
+      if(!txt) return;
       shopData.push({txt, got:false, cat:guessShopCat(txt)});
       added++;
     });
-    saveShop(); renderShop();
+    saveShop(); renderShop(); renderShopTools();
     alert(added+'개의 살 것을 목록에 넣었어요.');
   });
   this.value='';
@@ -1329,6 +1522,14 @@ document.getElementById('deckClearAll').onclick=()=>{
   if(pins.length && confirm('핀을 전부 지울까요? (사진은 그대로 남아요)')){
     pins=[]; saveDeck(); renderPins(); renderDeckPicked();
   }
+};
+document.getElementById('deckDelImg').onclick=async()=>{
+  if(!deckImg){ alert('지울 배치도 사진이 없어요.'); return; }
+  if(!confirm('배치도 사진을 지울까요?\n사진과 찍어둔 핀이 모두 사라져요.')) return;
+  // 인터넷 창고에서도 지우기
+  if(sb && deckImgPath){ try{ await sb.storage.from(PHOTO_BUCKET).remove([deckImgPath]); }catch(e){} }
+  deckImg=null; deckImgPath=null; pins=[];
+  saveDeck(); showDeck();
 };
 
 /* ================= 캠핑 사진 앨범 (Supabase Storage) ================= */
@@ -1721,6 +1922,30 @@ function renderTrips(){
   upcoming.sort((a,b)=> new Date(a.date) - new Date(b.date));
   past.sort((a,b)=> new Date(b.date) - new Date(a.date));
 
+  /* ---- 캠핑장별 방문 횟수 세기 ---- */
+  // 이름의 공백·대소문자 차이는 같은 곳으로 본다
+  function placeKey(t){ return String(t.place||'캠핑').replace(/\s/g,'').toLowerCase(); }
+  const visitCount = {};   // 캠핑장별 총 횟수
+  const placeLabel = {};   // 화면에 보여줄 이름
+  trips.forEach(t=>{
+    const k = placeKey(t);
+    visitCount[k] = (visitCount[k]||0) + 1;
+    if(!placeLabel[k]) placeLabel[k] = t.place || '캠핑';
+  });
+  // 각 캠핑이 그 캠핑장의 몇 번째 방문인지 (날짜 순서 기준)
+  const orderNo = {};
+  const byDate = [...trips].sort((a,b)=>{
+    const da = a.date ? new Date(a.date).getTime() : 0;
+    const db = b.date ? new Date(b.date).getTime() : 0;
+    return da - db;
+  });
+  const seenCnt = {};
+  byDate.forEach(t=>{
+    const k = placeKey(t);
+    seenCnt[k] = (seenCnt[k]||0) + 1;
+    orderNo[t.id] = seenCnt[k];
+  });
+
   function fmt(t){
     if(!t.date) return '날짜 미정';
     const d = new Date(t.date);
@@ -1745,7 +1970,15 @@ function renderTrips(){
       const hi = t.weather.tmax==null?'':Math.round(t.weather.tmax)+'°';
       wxTxt = ' · '+we+' '+hi;
     }
-    return '<div class="trip"><div class="th"><b>'+(t.place||'캠핑')+'</b><span class="when">'+fmt(t)+'</span></div>'
+    // 여러 번 간 곳이면 "N번째" 배지
+    const k = placeKey(t);
+    const total = visitCount[k] || 1;
+    const nth = orderNo[t.id] || 1;
+    const visitBadge = (total > 1)
+      ? '<span class="visit-badge" title="이 캠핑장 '+total+'번 중 '+nth+'번째">'+nth+'번째</span>'
+      : '';
+    return '<div class="trip"><div class="th"><b>'+(t.place||'캠핑')+visitBadge+'</b><span class="when">'+fmt(t)+'</span></div>'
+      +(t.addr && t.addr!==t.place ? '<div style="font-size:12.5px;color:#9c9684;margin-top:2px">📍 '+t.addr+'</div>' : '')
       +'<div class="meta">'+withHtml+nights+wxTxt+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
       +'<div class="tbtns"><button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>'
       +'<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>'
@@ -1753,6 +1986,23 @@ function renderTrips(){
   }
 
   let html='';
+
+  /* ---- 캠핑장별 방문 횟수 요약 ---- */
+  const rank = Object.keys(visitCount)
+    .map(k=>({key:k, name:placeLabel[k], n:visitCount[k]}))
+    .sort((a,b)=> b.n - a.n || a.name.localeCompare(b.name,'ko'));
+  if(rank.length){
+    const repeat = rank.filter(r=>r.n>1).length;
+    html += '<div class="visit-summary">'
+      + '<div class="vs-title">📊 캠핑장별 다녀온 횟수 <small>총 '+trips.length+'번 · '+rank.length+'곳'
+      + (repeat?(' · 다시 간 곳 '+repeat+'곳'):'') + '</small></div>'
+      + '<div class="vs-list">'
+      + rank.map(r=>
+          '<span class="vs-item'+(r.n>1?' many':'')+'">'+r.name+' <b>'+r.n+'번</b></span>'
+        ).join('')
+      + '</div></div>';
+  }
+
   if(upcoming.length){
     html += '<div class="trip-group"><div class="group-title">🎒 가기로 한 캠핑 <small>'+upcoming.length+'곳</small></div>'
       + upcoming.map(card).join('') + '</div>';
@@ -1801,7 +2051,8 @@ function renderTrips(){
     if(asCopy) album=[];
     saveAlbum();
     if(t.lat){ setMap(t.lat,t.lon,t.place, asCopy?11:12); }
-    document.getElementById('placeInput').value = asCopy ? '' : (document.getElementById('placeInput').value);
+    document.getElementById('campName').value = asCopy ? '' : (t.place||'');
+    document.getElementById('placeInput').value = asCopy ? '' : (t.addr || '');
     document.getElementById('tripDate').value = asCopy ? '' : (t.date||'');
     document.getElementById('tripEnd').value = asCopy ? '' : (t.end||'');
     dayWeather = asCopy ? null : (t.weather || null);
@@ -1813,7 +2064,7 @@ function renderTrips(){
     }
     updateNights();
     document.getElementById('tripWith').value = asCopy ? '' : (t.with||'');
-    renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShop();
+    renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShopTools(); renderShop();
     showDeck();
     renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum();
     window.scrollTo({top:0,behavior:'smooth'});
@@ -1850,7 +2101,11 @@ document.getElementById('tripSave').onclick=()=>{
   }
   trips.unshift({
     id: Date.now(),
-    place: currentPlace.name || document.getElementById('placeInput').value.trim() || '캠핑',
+    place: (document.getElementById('campName').value.trim()
+            || currentPlace.name
+            || document.getElementById('placeInput').value.trim()
+            || '캠핑'),
+    addr: document.getElementById('placeInput').value.trim(),
     lat: currentPlace.lat, lon: currentPlace.lon,
     date: document.getElementById('tripDate').value,
     end: document.getElementById('tripEnd').value,
@@ -1918,7 +2173,8 @@ function renderEverything(){
   receipts = store.get('camp_receipts', []);
   settleFiles = store.get('camp_settlefiles', []);
   trips = store.get('camp_trips', []);
-  renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShop(); renderTrips();
+  document.getElementById('campName').value = store.get('camp_name','') || '';
+  renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShopTools(); renderShop(); renderTrips();
   showDeck();
   renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum();
   updateMapLinks();
