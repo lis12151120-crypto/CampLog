@@ -252,6 +252,42 @@
   .trip.trip-dim{opacity:.82}
   .trip.trip-dim .meta{color:#a49c86}
 
+  /* ---- 지금 작업 중인 캠핑 띠 ---- */
+  .cur-trip-bar{
+    background:linear-gradient(135deg,#3a5169,#2f3e34);color:#fff;
+    border-radius:12px;padding:12px 16px;margin:14px 0 4px;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14.5px;
+  }
+  .cur-trip-bar b{font-size:16px}
+  .ct-label{font-size:11px;font-weight:700;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:999px}
+  .ct-label.new{background:var(--ember)}
+  .ct-date{font-size:12.5px;opacity:.8}
+  .ct-hint{font-size:12.5px;opacity:.85}
+  .ct-new{
+    margin-left:auto;background:rgba(255,255,255,.18);color:#fff;border:none;
+    border-radius:8px;padding:7px 13px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600;
+  }
+  .ct-new:hover{background:rgba(255,255,255,.3)}
+
+  .who-summary{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px}
+  .who-summary .ws-title{font-size:12px;color:var(--moss);font-weight:700}
+  .who-summary .ws-empty{font-size:12.5px;color:#9c9684}
+  .who-summary .ws-item{
+    font-size:12.5px;background:#fffdf7;border:1px solid var(--line);
+    border-radius:999px;padding:4px 11px;color:var(--bark);
+  }
+  .who-summary .ws-item b{color:var(--moss)}
+  .who-summary .ws-item.none{border-style:dashed;color:#9c9684}
+
+  /* ---- 담당자 표시 ---- */
+  .who-tag{
+    font-size:11.5px;padding:3px 9px;border-radius:999px;cursor:pointer;white-space:nowrap;
+    border:1px dashed var(--sage);color:#9c9684;background:transparent;flex:0 0 auto;
+  }
+  .who-tag.has{background:var(--dusk,#3a5169);color:#fff;border:1px solid var(--dusk,#3a5169)}
+  .who-tag:hover{filter:brightness(1.08)}
+  body.role-viewer .who-tag{cursor:default;opacity:.7}
+
   /* ---- 캠핑 참여자 고르기 ---- */
   .member-picks{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;
     background:#fffdf7;border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:44px;align-items:center}
@@ -450,6 +486,8 @@
 
 <div class="wrap" id="mainApp" style="display:none">
 
+  <div id="currentTripBar" class="cur-trip-bar" style="display:none"></div>
+
   <header class="top">
     <div class="badge">Camp · Log</div>
     <h1>CampLog</h1>
@@ -596,6 +634,7 @@
     <div class="chk-cats" id="chkCats"></div>
     <div class="progress"><i id="progBar"></i></div>
     <div class="progress-label" id="progLabel">0개 중 0개 챙김</div>
+    <div class="who-summary" id="whoSummary"></div>
     <ul class="checklist" id="checklist"></ul>
     <div class="add-row">
       <select id="chkCatSel" style="flex:0 0 auto;width:auto"></select>
@@ -792,7 +831,7 @@ const SB_KEY = 'sb_publishable_a6NeiZodJWxkDjt-_Wuiow_AT2OmYjX';
 let sb = null;
 let currentUser = null;
 // CampLog가 쓰는 저장 칸 이름들 (이 값들을 통째로 인터넷에 올린다)
-const CAMP_KEYS = ['camp_name','camp_checklist','camp_shop','camp_deck_img','camp_deck_img_path','camp_deck_pins','camp_album',
+const CAMP_KEYS = ['camp_name','camp_current_trip','camp_checklist','camp_shop','camp_deck_img','camp_deck_img_path','camp_deck_pins','camp_album',
   'camp_members','camp_expenses','camp_receipts','camp_settlefiles','camp_trips','camp_place'];
 
 function collectAllData(){
@@ -1184,6 +1223,8 @@ function tidyChecklist(){
   alert('정리했어요!\n\n· 번호 뗀 항목: '+renamed+'개\n· 칸을 옮긴 항목: '+moved+'개\n· 중복 합친 항목: '+removed+'개');
 }
 let checklistData = store.get('camp_checklist', null);
+/* 지금 어떤 캠핑을 작업 중인지 (null이면 새 캠핑 준비 중) */
+let currentTripId = store.get('camp_current_trip', null);
 let activeCat = '전체';
 
 if(!checklistData){
@@ -1204,6 +1245,31 @@ function renderCats(){
   document.getElementById('chkCloseAll').onclick=()=>{ openCats={}; renderChecklist(); };
   document.getElementById('chkTidy').onclick=tidyChecklist;
 }
+/* 누가 무엇을 챙기는지 요약 */
+function renderWhoSummary(){
+  const box = document.getElementById('whoSummary');
+  if(!box) return;
+  const byWho = {};
+  let noneCnt = 0;
+  checklistData.forEach(i=>{
+    const w = (i.who||'').trim();
+    if(!w){ noneCnt++; return; }
+    if(!byWho[w]) byWho[w] = {total:0, done:0};
+    byWho[w].total++;
+    if(i.done) byWho[w].done++;
+  });
+  const names = Object.keys(byWho);
+  if(!names.length){
+    box.innerHTML = '<span class="ws-empty">준비물 오른쪽 <b>＋담당</b>을 눌러 누가 챙길지 정해 보세요.</span>';
+    return;
+  }
+  box.innerHTML = '<span class="ws-title">🙋 담당</span>'
+    + names.sort().map(n=>
+        '<span class="ws-item">'+n+' <b>'+byWho[n].done+'/'+byWho[n].total+'</b></span>'
+      ).join('')
+    + (noneCnt ? '<span class="ws-item none">담당 미정 <b>'+noneCnt+'</b></span>' : '');
+}
+
 function catRank(c){ const i=catOrder.indexOf(c); return i<0?catOrder.length:i; }
 let openCats = {};  // 어떤 분류가 펼쳐졌는지 기억
 function renderChecklist(){
@@ -1212,9 +1278,13 @@ function renderChecklist(){
 
   function itemLi(i){
     const idx = checklistData.indexOf(i);
+    const who = i.who ? i.who : '';
     return '<li class="'+(i.done?'done':'')+'">'
       +'<input type="checkbox" data-i="'+idx+'" '+(i.done?'checked':'')+'>'
       +'<span class="txt">'+i.txt+'</span>'
+      +'<span class="who-tag'+(who?' has':'')+'" data-who="'+idx+'" title="누르면 담당자를 정할 수 있어요">'
+        +(who ? '🙋 '+who : '＋담당')
+      +'</span>'
       +'<button class="del" data-d="'+idx+'">×</button></li>';
   }
 
@@ -1235,11 +1305,25 @@ function renderChecklist(){
       const c=h.dataset.cat; openCats[c]=!openCats[c]; renderChecklist();
     };
   });
+  renderWhoSummary();
   ul.querySelectorAll('input[type=checkbox]').forEach(cb=>{
     cb.onchange=()=>{ checklistData[cb.dataset.i].done=cb.checked; saveChecklist(); renderChecklist(); };
   });
   ul.querySelectorAll('.del').forEach(b=>{
     b.onclick=(e)=>{ e.stopPropagation(); checklistData.splice(b.dataset.d,1); saveChecklist(); renderCats(); renderChecklist(); };
+  });
+  // 담당자 정하기
+  ul.querySelectorAll('.who-tag').forEach(el=>{
+    el.onclick=(e)=>{
+      e.stopPropagation();
+      if(typeof canEdit==='function' && !canEdit()) return;
+      const idx = el.dataset.who;
+      const now = checklistData[idx].who || '';
+      const v = prompt('이 준비물을 누가 챙길까요?\n(비우고 확인하면 담당자가 지워져요)', now);
+      if(v===null) return;
+      checklistData[idx].who = v.trim();
+      saveChecklist(); renderChecklist();
+    };
   });
   updateProgress();
 }
@@ -1394,9 +1478,13 @@ function renderShop(){
   if(!shopData.length){ ul.innerHTML='<li class="empty" style="justify-content:center">아직 적은 게 없어요. 살 것을 추가해 보세요.</li>'; return; }
   function itemLi(s){
     const idx=shopData.indexOf(s);
+    const who = s.who ? s.who : '';
     return '<li class="'+(s.got?'got':'')+'">'
       +'<input type="checkbox" data-i="'+idx+'" '+(s.got?'checked':'')+'>'
       +'<span>'+s.txt+'</span>'
+      +'<span class="who-tag'+(who?' has':'')+'" data-who="'+idx+'" title="누르면 담당자를 정할 수 있어요">'
+        +(who ? '🙋 '+who : '＋담당')
+      +'</span>'
       +'<button class="del" data-d="'+idx+'">×</button></li>';
   }
   const cats=[...new Set(shopData.map(s=>s.cat||'기타'))].sort((a,b)=>shopRank(a)-shopRank(b));
@@ -1415,6 +1503,18 @@ function renderShop(){
   });
   ul.querySelectorAll('.del').forEach(b=>{
     b.onclick=(e)=>{ e.stopPropagation(); shopData.splice(b.dataset.d,1); saveShop(); renderShop(); };
+  });
+  ul.querySelectorAll('.who-tag').forEach(el=>{
+    el.onclick=(e)=>{
+      e.stopPropagation();
+      if(typeof canEdit==='function' && !canEdit()) return;
+      const idx = el.dataset.who;
+      const now = shopData[idx].who || '';
+      const v = prompt('이건 누가 사올까요?\n(비우고 확인하면 담당자가 지워져요)', now);
+      if(v===null) return;
+      shopData[idx].who = v.trim();
+      saveShop(); renderShop();
+    };
   });
 }
 document.getElementById('shopAdd').onclick=()=>{
@@ -2104,6 +2204,8 @@ function renderTrips(){
   });
 
   function applyTrip(t, asCopy){
+    currentTripId = asCopy ? null : t.id;
+    store.set('camp_current_trip', currentTripId);
     checklistData = JSON.parse(JSON.stringify(t.checklist)); saveChecklist();
     shopData = JSON.parse(JSON.stringify(t.shop)); saveShop();
     myDeck = null;
@@ -2143,7 +2245,7 @@ function renderTrips(){
     document.getElementById('tripWith').value = asCopy ? '' : (t.with||'');
     renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShopTools(); renderShop();
     showDeck();
-    renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum();
+    renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum(); renderCurrentTripBar();
     window.scrollTo({top:0,behavior:'smooth'});
   }
 
@@ -2176,8 +2278,8 @@ document.getElementById('tripSave').onclick=()=>{
     if(lockPw===null){ return; }         // 취소하면 저장 중단
     if(!lockPw.trim()){ alert('비밀번호가 비어 있어 잠그지 않고 저장할게요.'); }
   }
-  trips.unshift({
-    id: Date.now(),
+  const tripObj = {
+    id: currentTripId || Date.now(),
     place: (document.getElementById('campName').value.trim()
             || currentPlace.name
             || document.getElementById('placeInput').value.trim()
@@ -2202,10 +2304,23 @@ document.getElementById('tripSave').onclick=()=>{
     album: JSON.parse(JSON.stringify(album)),
     checklist: JSON.parse(JSON.stringify(checklistData)),
     shop: JSON.parse(JSON.stringify(shopData))
-  });
-  saveTrips(); renderTrips();
+  };
+
+  // 이미 있는 캠핑을 고쳐서 저장하는 경우 → 덮어쓰기
+  const exist = trips.findIndex(x=>x.id==tripObj.id);
+  if(exist >= 0){
+    // 만든 사람 정보는 원래대로 유지
+    tripObj.ownerId = trips[exist].ownerId || tripObj.ownerId;
+    trips[exist] = tripObj;
+  }else{
+    trips.unshift(tripObj);
+  }
+  currentTripId = tripObj.id;
+  store.set('camp_current_trip', currentTripId);
+
+  saveTrips(); renderTrips(); renderCurrentTripBar();
   document.getElementById('tripLock').checked=false;
-  alert('저장했어요! 아래 목록에 날짜순으로 정리돼요.');
+  alert(exist>=0 ? '수정한 내용을 저장했어요!' : '새 캠핑으로 저장했어요! 아래 목록에 날짜순으로 정리돼요.');
 };
 
 /* ================= 시작 ================= */
@@ -2252,10 +2367,11 @@ function renderEverything(){
   receipts = store.get('camp_receipts', []);
   settleFiles = store.get('camp_settlefiles', []);
   trips = store.get('camp_trips', []);
+  currentTripId = store.get('camp_current_trip', null);
   document.getElementById('campName').value = store.get('camp_name','') || '';
   renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShopTools(); renderShop(); renderTrips();
   showDeck();
-  renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum();
+  renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum(); renderCurrentTripBar();
   updateMapLinks();
 }
 
@@ -2366,6 +2482,56 @@ function canSeeTripDetail(t){
   if(t.ownerId && t.ownerId === uid) return true;       // 내가 만든 캠핑
   if(Array.isArray(t.memberIds) && t.memberIds.includes(uid)) return true;  // 내가 참여한 캠핑
   return false;                                          // 팀원이지만 참여 안 한 캠핑 → 겉만
+}
+
+/* ---- 지금 작업 중인 캠핑 띠 ---- */
+function renderCurrentTripBar(){
+  const bar = document.getElementById('currentTripBar');
+  if(!bar) return;
+  const t = currentTripId ? trips.find(x=>x.id==currentTripId) : null;
+  if(t){
+    bar.style.display='block';
+    bar.innerHTML = '<span class="ct-label">지금 작업 중</span>'
+      + '<b>'+(t.place||'캠핑')+'</b>'
+      + (t.date?('<span class="ct-date">'+t.date+'</span>'):'')
+      + '<button class="ct-new" id="ctNewBtn">＋ 새 캠핑 시작</button>';
+    const btn=document.getElementById('ctNewBtn');
+    if(btn) btn.onclick=startNewTrip;
+  }else{
+    bar.style.display='block';
+    bar.innerHTML = '<span class="ct-label new">새 캠핑 준비 중</span>'
+      + '<span class="ct-hint">준비물·장보기를 채우고 아래에서 저장하면 새 캠핑으로 기록돼요.</span>';
+  }
+}
+
+/* 새 캠핑 시작하기 (지금 내용 비우기) */
+function startNewTrip(){
+  if(!confirm('새 캠핑을 시작할까요?\n\n지금 화면의 준비물·장보기·정산·사진이 비워져요.\n저장해 둔 캠핑 기록은 그대로 남아요.')) return;
+  currentTripId = null;
+  store.set('camp_current_trip', null);
+  // 준비물은 기본 목록으로 새로 시작
+  checklistData = [];
+  defaultChecklist.forEach(g => g.items.forEach(it => checklistData.push({cat:g.cat, txt:it, done:false, who:''})));
+  saveChecklist();
+  shopData = []; saveShop();
+  members = []; expenses = []; saveSplit();
+  receipts = []; saveReceipts();
+  settleFiles = []; saveSettleFiles();
+  album = []; saveAlbum();
+  deckImg = null; deckImgPath = null; pins = []; saveDeck();
+  tripPickedIds = []; dayWeather = null;
+  document.getElementById('campName').value='';
+  document.getElementById('placeInput').value='';
+  document.getElementById('tripDate').value='';
+  document.getElementById('tripEnd').value='';
+  document.getElementById('tripWith').value='';
+  document.getElementById('wxDayBox').innerHTML='';
+  renderCats(); fillChkCatSel(); renderChecklist();
+  fillShopCatSel(); renderShopTools(); renderShop();
+  showDeck(); renderMembers(); renderExpenses(); renderSettle();
+  renderReceipts(); renderSettleFiles(); renderAlbum();
+  renderTripMemberPicks(); renderCurrentTripBar();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 async function loadMyRole(){
