@@ -131,6 +131,21 @@
   .place-name b{color:var(--ember)}
 
   /* ---- 날씨 ---- */
+  /* ---- 그날 날씨 카드 ---- */
+  .wx-day-box{margin-top:12px}
+  .wx-day-msg{font-size:13.5px;color:var(--moss);background:#fff9ec;border:1px dashed var(--sage);border-radius:10px;padding:11px 13px}
+  .wx-day-card{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#fff9ec,#f1ead8);
+    border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .wx-day-emo{font-size:42px;line-height:1}
+  .wx-day-info{flex:1}
+  .wx-day-date{font-size:13px;color:var(--moss);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .wx-day-temp{font-size:17px;color:var(--bark);margin-top:3px}
+  .wx-day-temp b{color:var(--ember);font-size:20px}
+  .wx-day-rain{font-size:13px;color:var(--dusk,#3a5169);margin-top:2px}
+  .wx-tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .wx-tag.past{background:var(--moss);color:#fff}
+  .wx-tag.future{background:#dfe9f7;color:#3a5169}
+
   .wx-grid{
     display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
     gap:10px;margin-top:6px;
@@ -502,10 +517,12 @@
   <!-- 2. 날씨 -->
   <section class="card">
     <h2><span class="ico">⛅</span> 캠핑장 날씨</h2>
-    <p class="hint">위에서 캠핑장 위치를 표시하면, 그곳의 7일 날씨를 볼 수 있어요.</p>
+    <p class="hint">위에서 캠핑장 위치를 표시하면 날씨를 볼 수 있어요. 아래 캠핑 날짜를 넣으면 <b>그날 날씨</b>도 확인해서 기록으로 남겨요. (지난 날짜는 실제 날씨, 앞날은 예보)</p>
     <div class="btn-row">
-      <button class="btn btn-ember" id="wxBtn">날씨 불러오기</button>
+      <button class="btn btn-ember" id="wxBtn">앞으로 7일 날씨 보기</button>
+      <button class="btn btn-ghost" id="wxDayBtn">캠핑 날짜의 날씨 기록하기</button>
     </div>
+    <div class="wx-day-box" id="wxDayBox"></div>
     <div class="wx-grid" id="wxGrid"></div>
     <div class="wx-note" id="wxNote" style="display:none"></div>
   </section>
@@ -689,7 +706,7 @@ const SB_KEY = 'sb_publishable_a6NeiZodJWxkDjt-_Wuiow_AT2OmYjX';
 let sb = null;
 let currentUser = null;
 // CampLog가 쓰는 저장 칸 이름들 (이 값들을 통째로 인터넷에 올린다)
-const CAMP_KEYS = ['camp_checklist','camp_shop','camp_deck_img','camp_deck_pins','camp_album',
+const CAMP_KEYS = ['camp_checklist','camp_shop','camp_deck_img','camp_deck_img_path','camp_deck_pins','camp_album',
   'camp_members','camp_expenses','camp_receipts','camp_settlefiles','camp_trips','camp_place'];
 
 function collectAllData(){
@@ -863,6 +880,131 @@ async function loadWeather(){
   }catch(e){
     grid.innerHTML='<div style="color:#c96f3f;padding:8px">날씨를 못 불러왔어요. 인터넷 연결을 확인하고 다시 눌러 주세요.</div>';
   }
+}
+
+/* ===== 캠핑 날짜의 날씨 (과거=실제·저장 / 미래=예보·실시간) ===== */
+let dayWeather = null;   // {date, code, tmax, tmin, rain, saved}
+
+function tripKey(){
+  // 캠핑을 구분하는 열쇠: 장소이름 + 좌표
+  const nm = (document.getElementById('placeInput').value.trim() || currentPlace.name || '캠핑');
+  return nm + '@' + (currentPlace.lat||0).toFixed(3) + ',' + (currentPlace.lon||0).toFixed(3);
+}
+
+// supabase에 저장된 과거 날씨가 있는지 먼저 확인
+async function getSavedWeather(dateStr){
+  if(!sb || !currentUser) return null;
+  try{
+    const { data, error } = await sb.from('camplog_weather')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .eq('trip_key', tripKey())
+      .eq('wdate', dateStr)
+      .maybeSingle();
+    if(error) return null;
+    return data || null;
+  }catch(e){ return null; }
+}
+// 과거 날씨를 supabase에 저장 (한 번만)
+async function saveWeather(dateStr, w){
+  if(!sb || !currentUser) return;
+  try{
+    await sb.from('camplog_weather').upsert({
+      user_id: currentUser.id,
+      trip_key: tripKey(),
+      wdate: dateStr,
+      lat: currentPlace.lat, lon: currentPlace.lon,
+      code: w.code, tmax: w.tmax, tmin: w.tmin, rain: w.rain
+    }, { onConflict:'user_id,trip_key,wdate' });
+  }catch(e){}
+}
+
+async function loadDayWeather(){
+  const box = document.getElementById('wxDayBox');
+  const dateStr = document.getElementById('tripDate').value;
+  if(!dateStr){ box.innerHTML='<div class="wx-day-msg">아래 ‘이 캠핑 저장하기’에서 <b>시작 날짜</b>를 먼저 넣어 주세요.</div>'; return; }
+  if(!currentPlace || !currentPlace.lat){ box.innerHTML='<div class="wx-day-msg">위에서 <b>‘날씨용 위치 표시’</b>를 눌러 캠핑장 위치를 먼저 잡아 주세요.</div>'; return; }
+
+  box.innerHTML='<div class="wx-day-msg">그날 날씨를 확인하는 중…</div>';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const target = new Date(dateStr); target.setHours(0,0,0,0);
+  const isPast = target < today;
+
+  try{
+    if(isPast){
+      // 1) 이미 저장된 게 있으면 그걸 쓴다 (API 재호출 안 함)
+      const saved = await getSavedWeather(dateStr);
+      if(saved){
+        dayWeather = {date:dateStr, code:saved.code, tmax:saved.tmax, tmin:saved.tmin, rain:saved.rain, saved:true};
+        renderDayWeather(true, true);
+        return;
+      }
+      // 2) 없으면 과거 실제 날씨를 조회해서 저장
+      const url = 'https://archive-api.open-meteo.com/v1/archive'
+        +'?latitude='+currentPlace.lat+'&longitude='+currentPlace.lon
+        +'&start_date='+dateStr+'&end_date='+dateStr
+        +'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto';
+      const r = await fetch(url); const d = await r.json();
+      if(!d.daily || !d.daily.time || !d.daily.time.length) throw new Error('no data');
+      dayWeather = {
+        date: dateStr,
+        code: d.daily.weather_code[0],
+        tmax: d.daily.temperature_2m_max[0],
+        tmin: d.daily.temperature_2m_min[0],
+        rain: d.daily.precipitation_sum[0],
+        saved: false
+      };
+      await saveWeather(dateStr, dayWeather);
+      dayWeather.saved = true;
+      renderDayWeather(true, false);
+    }else{
+      // 미래: 예보를 실시간 조회 (저장 안 함)
+      const url = 'https://api.open-meteo.com/v1/forecast'
+        +'?latitude='+currentPlace.lat+'&longitude='+currentPlace.lon
+        +'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+        +'&start_date='+dateStr+'&end_date='+dateStr+'&timezone=auto';
+      const r = await fetch(url); const d = await r.json();
+      if(!d.daily || !d.daily.time || !d.daily.time.length) throw new Error('no data');
+      dayWeather = {
+        date: dateStr,
+        code: d.daily.weather_code[0],
+        tmax: d.daily.temperature_2m_max[0],
+        tmin: d.daily.temperature_2m_min[0],
+        rain: d.daily.precipitation_probability_max[0],
+        saved: false
+      };
+      renderDayWeather(false, false);
+    }
+  }catch(e){
+    box.innerHTML='<div class="wx-day-msg" style="color:var(--ember)">그날 날씨를 못 가져왔어요. 날짜가 너무 먼 앞날이거나(예보는 약 2주까지), 인터넷 문제일 수 있어요.</div>';
+  }
+}
+
+function renderDayWeather(isPast, fromCache){
+  const box = document.getElementById('wxDayBox');
+  if(!dayWeather){ box.innerHTML=''; return; }
+  const [emo, desc] = wxEmoji(dayWeather.code);
+  const d = new Date(dayWeather.date);
+  const dow=['일','월','화','수','목','금','토'];
+  const dstr = d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate()+'('+dow[d.getDay()]+')';
+  const hi = dayWeather.tmax==null?'-':Math.round(dayWeather.tmax)+'°';
+  const lo = dayWeather.tmin==null?'-':Math.round(dayWeather.tmin)+'°';
+  const rainTxt = isPast
+    ? ('비 '+(dayWeather.rain==null?'-':dayWeather.rain+'mm'))
+    : ('강수확률 '+(dayWeather.rain==null?'-':dayWeather.rain+'%'));
+  const tag = isPast
+    ? '<span class="wx-tag past">그날 실제 날씨'+(fromCache?' · 저장됨':' · 기록함')+'</span>'
+    : '<span class="wx-tag future">예보</span>';
+  box.innerHTML =
+    '<div class="wx-day-card">'
+      +'<div class="wx-day-emo">'+emo+'</div>'
+      +'<div class="wx-day-info">'
+        +'<div class="wx-day-date">'+dstr+' '+tag+'</div>'
+        +'<div class="wx-day-temp"><b>'+hi+'</b> / '+lo+' · '+desc+'</div>'
+        +'<div class="wx-day-rain">'+rainTxt+'</div>'
+      +'</div>'
+    +'</div>';
 }
 
 /* ================= 준비물 체크리스트 ================= */
@@ -1060,9 +1202,12 @@ document.getElementById('shopFile').addEventListener('change', function(){
 /* ================= 데크 배치도 (사진 + 핀) ================= */
 /* deckImg: 사진 데이터(문자열), pins: [{x,y}] — x,y는 사진 안에서의 비율(0~1) */
 let deckImg = store.get('camp_deck_img', null);
+let deckImgPath = store.get('camp_deck_img_path', null);
+// 옛 형식(글자 덩어리)이면 정리
+if(deckImg && deckImg.startsWith('data:')){ deckImg=null; deckImgPath=null; store.set('camp_deck_img',null); store.set('camp_deck_img_path',null); }
 let pins = store.get('camp_deck_pins', []);
 
-function saveDeck(){ store.set('camp_deck_img', deckImg); store.set('camp_deck_pins', pins); }
+function saveDeck(){ store.set('camp_deck_img', deckImg); store.set('camp_deck_img_path', deckImgPath); store.set('camp_deck_pins', pins); }
 
 function showDeck(){
   const empty = document.getElementById('deckEmpty');
@@ -1113,17 +1258,25 @@ function renderDeckPicked(){
 }
 
 /* 사진 올리기 */
-document.getElementById('deckImgInput').addEventListener('change', function(){
-  const file = this.files[0];
+document.getElementById('deckImgInput').addEventListener('change', async function(){
+  const file = this.files[0]; this.value='';
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    deckImg = e.target.result;
+  if(!sb || !currentUser){ alert('로그인 후에 사진을 올릴 수 있어요.'); return; }
+  const empty=document.getElementById('deckEmpty');
+  if(empty){ empty.textContent='배치도 사진 올리는 중…'; empty.style.display='block'; }
+  try{
+    const small = await shrinkImage(file, 1600);
+    const path = currentUser.id+'/deck_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.jpg';
+    const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, small, {contentType:'image/jpeg'});
+    if(error){ alert('사진을 올리지 못했어요. supabase 사진 방 설정을 확인해 주세요.'); showDeck(); return; }
+    const { data } = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+    deckImg = data.publicUrl;
+    deckImgPath = path;
     pins = [];           // 새 사진이면 핀 초기화
     saveDeck(); showDeck();
-  };
-  reader.readAsDataURL(file);
-  this.value='';
+  }catch(e){
+    alert('사진 처리 중 문제가 생겼어요.'); showDeck();
+  }
 });
 
 /* 빈 곳을 눌러 핀 찍기 — 클릭을 받는 대상은 '핀 층(pinLayer)' 이다 */
@@ -1178,31 +1331,84 @@ document.getElementById('deckClearAll').onclick=()=>{
   }
 };
 
-/* ================= 캠핑 사진 앨범 ================= */
-let album = store.get('camp_album', []); // [dataURL,...]
+/* ================= 캠핑 사진 앨범 (Supabase Storage) ================= */
+/* album = [{url, path}]  — 사진은 Storage에, 앱에는 주소만 저장 */
+const PHOTO_BUCKET = 'camplog-photos';
+let album = store.get('camp_album', []);
+// 옛 형식(글자 덩어리)이 남아 있으면 빈 목록으로 정리
+if(album.length && typeof album[0] === 'string'){ album = []; store.set('camp_album', album); }
 function saveAlbum(){ store.set('camp_album', album); }
+
+/* 사진을 올리기 전에 적당한 크기로 줄이기 (빠르고 안정적) */
+function shrinkImage(file, maxSide){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e=>{ img.src = e.target.result; };
+    img.onload = ()=>{
+      let w = img.width, h = img.height;
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(b => resolve(b || file), 'image/jpeg', 0.82);
+    };
+    img.onerror = ()=> resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
 function renderAlbum(){
   const g=document.getElementById('albumGrid');
   if(!album.length){ g.innerHTML='<div class="album-empty">아직 올린 사진이 없어요.</div>'; return; }
-  g.innerHTML = album.map((src,i)=>
-    '<div class="ac"><img src="'+src+'" data-view="'+i+'"><button data-del="'+i+'">×</button></div>'
+  g.innerHTML = album.map((p,i)=>
+    '<div class="ac"><img src="'+p.url+'" data-view="'+i+'" loading="lazy"><button data-del="'+i+'">×</button></div>'
   ).join('');
   g.querySelectorAll('img[data-view]').forEach(im=>{
-    im.onclick=()=>{ const w=window.open(); if(w) w.document.write('<img src="'+album[im.dataset.view]+'" style="max-width:100%">'); };
+    im.onclick=()=>{ window.open(album[im.dataset.view].url, '_blank'); };
   });
   g.querySelectorAll('button[data-del]').forEach(b=>{
-    b.onclick=()=>{ if(confirm('이 사진을 지울까요?')){ album.splice(b.dataset.del,1); saveAlbum(); renderAlbum(); } };
+    b.onclick=async()=>{
+      if(!confirm('이 사진을 지울까요?')) return;
+      const p = album[b.dataset.del];
+      // Storage에서도 지우기
+      if(sb && p.path){ try{ await sb.storage.from(PHOTO_BUCKET).remove([p.path]); }catch(e){} }
+      album.splice(b.dataset.del,1); saveAlbum(); renderAlbum();
+    };
   });
 }
-document.getElementById('albumFile').addEventListener('change', function(){
-  const files=[...this.files]; if(!files.length) return;
-  let left=files.length;
-  files.forEach(f=>{
-    const r=new FileReader();
-    r.onload=e=>{ album.push(e.target.result); left--; if(left===0){ saveAlbum(); renderAlbum(); } };
-    r.readAsDataURL(f);
-  });
-  this.value='';
+
+document.getElementById('albumFile').addEventListener('change', async function(){
+  const files=[...this.files]; this.value='';
+  if(!files.length) return;
+  if(!sb || !currentUser){ alert('로그인 후에 사진을 올릴 수 있어요.'); return; }
+
+  const g=document.getElementById('albumGrid');
+  const note=document.createElement('div');
+  note.className='album-empty'; note.textContent='사진 올리는 중… (0/'+files.length+')';
+  g.prepend(note);
+
+  let done=0, failed=0;
+  for(const f of files){
+    try{
+      const small = await shrinkImage(f, 1400);          // 긴 변 1400px로 줄임
+      const ext = 'jpg';
+      const path = currentUser.id+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
+      const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, small, {
+        contentType:'image/jpeg', upsert:false
+      });
+      if(error){ failed++; }
+      else{
+        const { data } = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+        album.push({ url: data.publicUrl, path });
+      }
+    }catch(e){ failed++; }
+    done++;
+    note.textContent='사진 올리는 중… ('+done+'/'+files.length+')';
+  }
+  saveAlbum(); renderAlbum();
+  if(failed) alert(failed+'장은 올리지 못했어요. supabase에 사진 방(camplog-photos)이 만들어져 있는지 확인해 주세요.');
 });
 
 /* ================= 비용 정산 ================= */
@@ -1221,30 +1427,45 @@ function nightsTextGlobal(startV, endV){
   return days+'박'+(days+1)+'일';
 }
 
-/* 영수증 사진 */
-let receipts = store.get('camp_receipts', []); // [dataURL, ...]
+/* 영수증 사진 (Supabase Storage) */
+let receipts = store.get('camp_receipts', []); // [{url, path}]
+if(receipts.length && typeof receipts[0] === 'string'){ receipts = []; store.set('camp_receipts', receipts); }
 function saveReceipts(){ store.set('camp_receipts', receipts); }
 function renderReceipts(){
   const g=document.getElementById('receiptGrid');
-  g.innerHTML = receipts.map((src,i)=>
-    '<div class="rc"><img src="'+src+'" data-view="'+i+'"><button data-del="'+i+'">×</button></div>'
+  g.innerHTML = receipts.map((p,i)=>
+    '<div class="rc"><img src="'+p.url+'" data-view="'+i+'" loading="lazy"><button data-del="'+i+'">×</button></div>'
   ).join('');
   g.querySelectorAll('img[data-view]').forEach(im=>{
-    im.onclick=()=>{ const w=window.open(); if(w) w.document.write('<img src="'+receipts[im.dataset.view]+'" style="max-width:100%">'); };
+    im.onclick=()=>{ window.open(receipts[im.dataset.view].url, '_blank'); };
   });
   g.querySelectorAll('button[data-del]').forEach(b=>{
-    b.onclick=()=>{ receipts.splice(b.dataset.del,1); saveReceipts(); renderReceipts(); };
+    b.onclick=async()=>{
+      const p=receipts[b.dataset.del];
+      if(sb && p.path){ try{ await sb.storage.from(PHOTO_BUCKET).remove([p.path]); }catch(e){} }
+      receipts.splice(b.dataset.del,1); saveReceipts(); renderReceipts();
+    };
   });
 }
-document.getElementById('receiptFile').addEventListener('change', function(){
-  const files=[...this.files]; if(!files.length) return;
-  let left=files.length;
-  files.forEach(f=>{
-    const r=new FileReader();
-    r.onload=e=>{ receipts.push(e.target.result); left--; if(left===0){ saveReceipts(); renderReceipts(); } };
-    r.readAsDataURL(f);
-  });
-  this.value='';
+document.getElementById('receiptFile').addEventListener('change', async function(){
+  const files=[...this.files]; this.value='';
+  if(!files.length) return;
+  if(!sb || !currentUser){ alert('로그인 후에 사진을 올릴 수 있어요.'); return; }
+  let failed=0;
+  for(const f of files){
+    try{
+      const small = await shrinkImage(f, 1400);
+      const path = currentUser.id+'/receipt_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.jpg';
+      const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, small, {contentType:'image/jpeg'});
+      if(error){ failed++; }
+      else{
+        const { data } = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+        receipts.push({url:data.publicUrl, path});
+      }
+    }catch(e){ failed++; }
+  }
+  saveReceipts(); renderReceipts();
+  if(failed) alert(failed+'장은 올리지 못했어요. supabase 사진 방 설정을 확인해 주세요.');
 });
 
 /* 정산 결과 파일 (그림·엑셀·PDF) */
@@ -1518,8 +1739,14 @@ function renderTrips(){
       ? '<span class="with-lock" data-lock="'+t.id+'">🔒 비공개 (눌러서 보기)</span>'
       : (t.with||'');
     const nights = (t.date&&t.end)? (' · 🏕️ '+nightsTextGlobal(t.date,t.end)) : '';
+    let wxTxt = '';
+    if(t.weather){
+      const [we] = wxEmoji(t.weather.code);
+      const hi = t.weather.tmax==null?'':Math.round(t.weather.tmax)+'°';
+      wxTxt = ' · '+we+' '+hi;
+    }
     return '<div class="trip"><div class="th"><b>'+(t.place||'캠핑')+'</b><span class="when">'+fmt(t)+'</span></div>'
-      +'<div class="meta">'+withHtml+nights+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
+      +'<div class="meta">'+withHtml+nights+wxTxt+(t.deckPins&&t.deckPins.length?(' · 데크 <b style="color:#c96f3f">'+t.deckPins.length+'곳 ⛺</b>'):'')+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
       +'<div class="tbtns"><button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>'
       +'<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>'
       +'<button class="btn btn-ghost" data-del="'+t.id+'">삭제</button></div></div>';
@@ -1556,6 +1783,7 @@ function renderTrips(){
     shopData = JSON.parse(JSON.stringify(t.shop)); saveShop();
     myDeck = null;
     deckImg = t.deckImg || null;
+    deckImgPath = t.deckImgPath || null;
     pins = t.deckPins ? JSON.parse(JSON.stringify(t.deckPins)) : [];
     saveDeck();
     members = t.members ? JSON.parse(JSON.stringify(t.members)) : [];
@@ -1576,6 +1804,13 @@ function renderTrips(){
     document.getElementById('placeInput').value = asCopy ? '' : (document.getElementById('placeInput').value);
     document.getElementById('tripDate').value = asCopy ? '' : (t.date||'');
     document.getElementById('tripEnd').value = asCopy ? '' : (t.end||'');
+    dayWeather = asCopy ? null : (t.weather || null);
+    if(dayWeather){
+      const past = new Date(dayWeather.date) < new Date(new Date().toDateString());
+      renderDayWeather(past, true);
+    }else{
+      document.getElementById('wxDayBox').innerHTML='';
+    }
     updateNights();
     document.getElementById('tripWith').value = asCopy ? '' : (t.with||'');
     renderCats(); fillChkCatSel(); renderChecklist(); fillShopCatSel(); renderShop();
@@ -1619,10 +1854,12 @@ document.getElementById('tripSave').onclick=()=>{
     lat: currentPlace.lat, lon: currentPlace.lon,
     date: document.getElementById('tripDate').value,
     end: document.getElementById('tripEnd').value,
+    weather: dayWeather ? JSON.parse(JSON.stringify(dayWeather)) : null,
     with: withVal,
     withLocked: (locked && withVal && lockPw.trim()) ? true : false,
     withPw: (locked && withVal && lockPw.trim()) ? lockPw.trim() : '',
     deckImg: deckImg,
+    deckImgPath: deckImgPath,
     deckPins: JSON.parse(JSON.stringify(pins)),
     members: JSON.parse(JSON.stringify(members)),
     expenses: JSON.parse(JSON.stringify(expenses)),
@@ -1656,6 +1893,7 @@ document.getElementById('tripEnd').addEventListener('change', updateNights);
 
 document.getElementById('findBtn').onclick=findPlace;
 document.getElementById('wxBtn').onclick=loadWeather;
+document.getElementById('wxDayBtn').onclick=loadDayWeather;
 document.getElementById('placeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') findPlace(); });
 
 /* 앱 화면 전체 그리기 (로그인 후 호출) */
@@ -1672,6 +1910,7 @@ function renderEverything(){
   checklistData = store.get('camp_checklist', checklistData);
   shopData = store.get('camp_shop', shopData);
   deckImg = store.get('camp_deck_img', null);
+  deckImgPath = store.get('camp_deck_img_path', null);
   pins = store.get('camp_deck_pins', []);
   album = store.get('camp_album', []);
   members = store.get('camp_members', []);
