@@ -244,6 +244,24 @@
     margin-left:7px;vertical-align:middle;
   }
 
+  /* ---- 계정 역할 ---- */
+  .role-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .role-badge.admin{background:#c96f3f;color:#fff}
+  .role-badge.member{background:#5c7a5a;color:#fff}
+  .role-badge.viewer{background:rgba(255,255,255,.22);color:#fff}
+  .admin-only-tag{font-size:11px;background:var(--ember);color:#fff;padding:2px 8px;border-radius:999px;font-weight:700;vertical-align:middle}
+  .acct{display:flex;align-items:center;gap:10px;justify-content:space-between;
+    border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-top:8px;background:#fffdf7}
+  .acct-info{flex:1;font-size:14px;color:var(--bark);word-break:break-all}
+  .acct-me{font-size:11px;background:var(--moss);color:#fff;padding:1px 7px;border-radius:999px;margin-left:7px}
+  .acct-sel{width:auto;flex:0 0 auto;font-size:13.5px;padding:7px 10px}
+  /* 열람자에게 가려지는 부분 */
+  .private-hidden{
+    background:#efe7d3;color:#9c9684;border-radius:8px;padding:10px 13px;
+    font-size:13.5px;text-align:center;border:1px dashed var(--sage);
+  }
+  body.role-viewer .hide-for-viewer{display:none !important}
+
   .trip-group{margin-top:16px}
   .trip-group:first-child{margin-top:6px}
   .group-title{
@@ -404,6 +422,7 @@
 <div id="userBar" style="display:none;background:var(--bark);color:#fff;padding:9px 16px;font-size:13px;position:sticky;top:0;z-index:500">
   <div style="max-width:960px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:10px">
     <span id="userBarEmail" style="opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <span id="roleBadge" class="role-badge viewer">열람자</span>
     <span style="display:flex;align-items:center;gap:12px;flex:0 0 auto">
       <span id="syncState" style="font-size:12px;opacity:.75"></span>
       <button id="logoutBtn" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer">로그아웃</button>
@@ -630,6 +649,10 @@
   <!-- 6. 돈 정산 -->
   <section class="card">
     <h2><span class="ico">💰</span> 비용 정산</h2>
+    <div class="private-hidden viewer-only" style="display:none">
+      🔒 개인정보 보호를 위해 정산 내용(사람 이름·금액·영수증)은 열람자에게 표시되지 않습니다.
+    </div>
+    <div class="hide-for-viewer">
     <p class="hint">함께 간 사람을 넣고, 쓴 돈을 항목별로 적어요. 항목마다 누가 냈는지, 누구끼리 나눠 낼지 고르면 한 사람당 낼 돈을 계산해 드려요.</p>
 
     <label class="fld" for="memberInput">함께 간 사람</label>
@@ -673,6 +696,7 @@
         <button class="btn btn-ghost" id="copySettle">📋 글자로 복사</button>
       </div>
     </div>
+    </div><!-- /hide-for-viewer -->
   </section>
 
   <!-- 7. 이 캠핑 저장 -->
@@ -712,6 +736,18 @@
     </div>
     <div id="allMap" style="height:340px;border-radius:12px;border:1px solid var(--line);margin-top:12px;display:none;z-index:0"></div>
     <div id="allMapNote" style="font-size:13px;color:var(--moss);margin-top:10px"></div>
+  </section>
+
+  <!-- 9. 계정 관리 (관리자만 보임) -->
+  <section class="card" id="adminSection" style="display:none">
+    <h2><span class="ico">⚙️</span> 계정 관리 <span class="admin-only-tag">관리자 전용</span></h2>
+    <p class="hint">함께 쓰는 분들의 역할을 정할 수 있어요. 새로 가입한 사람은 자동으로 <b>열람자</b>가 돼요.<br>
+      <b>관리자</b>는 모든 걸 할 수 있고, <b>팀원</b>은 기록을 함께 보고 입력할 수 있어요.
+      <b>열람자</b>는 보기만 가능하고 ‘누구랑’·정산·영수증은 가려져요.</p>
+    <div id="adminList"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="adminRefresh">목록 새로고침</button>
+    </div>
   </section>
 
   <footer class="foot">CampLog · 지도는 OpenStreetMap, 날씨는 Open-Meteo 무료 서비스를 사용합니다</footer>
@@ -1959,10 +1995,13 @@ function renderTrips(){
     const done = t.checklist.filter(x=>x.done).length;
     let spent = 0;
     if(t.expenses) t.expenses.forEach(e=>{ if(e.amount>0) spent += e.amount; });
-    const spentTxt = spent>0 ? (' · 💰 '+Math.round(spent).toLocaleString('ko-KR')+'원') : '';
-    const withHtml = t.withLocked
-      ? '<span class="with-lock" data-lock="'+t.id+'">🔒 비공개 (눌러서 보기)</span>'
-      : (t.with||'');
+    const viewerMode = (typeof canEdit === 'function') && !canEdit();
+    const spentTxt = (spent>0 && !viewerMode) ? (' · 💰 '+Math.round(spent).toLocaleString('ko-KR')+'원') : '';
+    const withHtml = viewerMode
+      ? '<span style="color:#9c9684">🔒 비공개</span>'
+      : (t.withLocked
+          ? '<span class="with-lock" data-lock="'+t.id+'">🔒 비공개 (눌러서 보기)</span>'
+          : (t.with||''));
     const nights = (t.date&&t.end)? (' · 🏕️ '+nightsTextGlobal(t.date,t.end)) : '';
     let wxTxt = '';
     if(t.weather){
@@ -2234,14 +2273,103 @@ function translateErr(m){
 document.getElementById('authGo').onclick=doAuth;
 document.getElementById('authPw').addEventListener('keydown',e=>{ if(e.key==='Enter') doAuth(); });
 
+/* ================= 계정 역할 (관리자/팀원/열람자) ================= */
+let myRole = 'viewer';   // admin(관리자) / member(팀원) / viewer(열람자)
+const ROLE_LABEL = { admin:'관리자', member:'팀원', viewer:'열람자' };
+
+/* 내 역할 확인. 없으면 열람자로 자동 등록 */
+async function loadMyRole(){
+  myRole = 'viewer';
+  if(!sb || !currentUser) return;
+  try{
+    const { data } = await sb.from('camplog_roles')
+      .select('role').eq('user_id', currentUser.id).maybeSingle();
+    if(data && data.role){ myRole = data.role; return; }
+    // 처음 로그인한 사람 → 열람자로 등록
+    await sb.from('camplog_roles').insert({
+      user_id: currentUser.id, email: currentUser.email, role: 'viewer'
+    });
+    myRole = 'viewer';
+  }catch(e){ myRole = 'viewer'; }
+}
+const canEdit = ()=> (myRole==='admin' || myRole==='member');
+const isAdmin = ()=> (myRole==='admin');
+document.getElementById('adminRefresh').onclick=()=>renderAdminPanel();
+
+/* 역할에 맞게 화면 잠그기 */
+function applyRoleToScreen(){
+  const badge = document.getElementById('roleBadge');
+  if(badge){
+    badge.textContent = ROLE_LABEL[myRole] || '열람자';
+    badge.className = 'role-badge ' + myRole;
+  }
+  document.body.classList.remove('role-admin','role-member','role-viewer');
+  document.body.classList.add('role-'+myRole);
+
+  // 열람자: 입력·버튼 모두 잠그기
+  if(!canEdit()){
+    document.querySelectorAll('#mainApp input, #mainApp select, #mainApp textarea')
+      .forEach(el=>{ el.disabled = true; });
+    document.querySelectorAll('#mainApp button').forEach(b=>{
+      // 보기용 버튼(지도·날씨·펼치기)은 남기고 나머지는 잠금
+      const keep = ['wxBtn','wxDayBtn','findBtn','allMapBtn','chkOpenAll','chkCloseAll','shopOpenAll','shopCloseAll'];
+      if(!keep.includes(b.id)) b.disabled = true;
+    });
+  }
+  // 열람자 안내 문구 켜고 끄기
+  document.querySelectorAll('.viewer-only').forEach(el=>{
+    el.style.display = canEdit() ? 'none' : 'block';
+  });
+  // 목록 다시 그려서 '누구랑' 가림 반영
+  if(typeof renderTrips === 'function') renderTrips();
+  // 관리자만 계정 관리 칸 보이기
+  const adminBox = document.getElementById('adminSection');
+  if(adminBox) adminBox.style.display = isAdmin() ? 'block' : 'none';
+}
+
+/* 관리자용 계정 목록 그리기 */
+async function renderAdminPanel(){
+  if(!isAdmin() || !sb) return;
+  const box = document.getElementById('adminList');
+  box.innerHTML = '<div class="empty">계정을 불러오는 중…</div>';
+  try{
+    const { data, error } = await sb.from('camplog_roles')
+      .select('user_id,email,role').order('role');
+    if(error || !data){ box.innerHTML='<div class="empty">계정 목록을 못 불러왔어요.</div>'; return; }
+    box.innerHTML = data.map(u=>{
+      const me = (u.user_id===currentUser.id);
+      return '<div class="acct">'
+        +'<div class="acct-info"><b>'+(u.email||'(이메일 없음)')+'</b>'
+          +(me?'<span class="acct-me">나</span>':'')+'</div>'
+        +'<select class="acct-sel" data-uid="'+u.user_id+'"'+(me?' disabled':'')+'>'
+          +'<option value="admin"'+(u.role==='admin'?' selected':'')+'>관리자</option>'
+          +'<option value="member"'+(u.role==='member'?' selected':'')+'>팀원</option>'
+          +'<option value="viewer"'+(u.role==='viewer'?' selected':'')+'>열람자</option>'
+        +'</select></div>';
+    }).join('') || '<div class="empty">아직 가입한 사람이 없어요.</div>';
+
+    box.querySelectorAll('.acct-sel').forEach(sel=>{
+      sel.onchange=async()=>{
+        const uid = sel.dataset.uid, role = sel.value;
+        const { error } = await sb.from('camplog_roles').update({role}).eq('user_id', uid);
+        if(error) alert('역할을 바꾸지 못했어요.');
+        else alert('역할을 '+ROLE_LABEL[role]+'(으)로 바꿨어요.');
+      };
+    });
+  }catch(e){ box.innerHTML='<div class="empty">계정 목록을 못 불러왔어요.</div>'; }
+}
+
 async function onLoggedIn(user){
   currentUser=user;
   document.getElementById('authScreen').style.display='none';
   document.getElementById('userBar').style.display='block';
   document.getElementById('mainApp').style.display='block';
   document.getElementById('userBarEmail').textContent='👤 '+(user.email||'로그인됨');
+  await loadMyRole();    // 내 역할 확인
   await cloudLoad();     // 인터넷 자료 먼저 가져오기
   renderEverything();    // 화면 그리기
+  applyRoleToScreen();   // 역할에 맞게 잠그기
+  if(isAdmin()) renderAdminPanel();
   setTimeout(()=>{ if(map) map.invalidateSize(); }, 200);
 }
 
