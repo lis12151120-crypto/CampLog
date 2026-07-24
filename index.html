@@ -263,6 +263,10 @@
   .ct-label.new{background:var(--ember)}
   .ct-date{font-size:12.5px;opacity:.8}
   .ct-hint{font-size:12.5px;opacity:.85}
+  .ct-warn{
+    flex-basis:100%;margin-top:8px;background:rgba(255,255,255,.15);
+    border-radius:8px;padding:8px 11px;font-size:12.5px;line-height:1.6;
+  }
   .ct-new{
     margin-left:auto;background:rgba(255,255,255,.18);color:#fff;border:none;
     border-radius:8px;padding:7px 13px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:600;
@@ -1719,7 +1723,7 @@ function renderPins(){
       if(typeof canEdit==='function' && !canEdit()) return;
       const i = parseInt(pin.dataset.i);
       if(confirm('이 핀을 지울까요?')){
-        pins.splice(i,1); saveDeck(); renderPins(); renderDeckPicked();
+        pins.splice(i,1); saveDeck(); renderPins(); renderDeckPicked(); autoSaveTripMedia();
       }
     };
     pin.addEventListener('click', handler);
@@ -1743,7 +1747,7 @@ function renderDeckPicked(){
     // 번호 입력 저장
     el.querySelectorAll('.dn-input').forEach(inp=>{
       if(typeof canEdit==='function' && !canEdit()){ inp.disabled = true; }
-      inp.oninput=()=>{ pins[inp.dataset.no].no = inp.value; saveDeck(); };
+      inp.oninput=()=>{ pins[inp.dataset.no].no = inp.value; saveDeck(); autoSaveTripMedia(); };
     });
   }else if(deckImg){
     el.classList.add('show');
@@ -1770,7 +1774,7 @@ document.getElementById('deckImgInput').addEventListener('change', async functio
     deckImg = data.publicUrl;
     deckImgPath = path;
     pins = [];           // 새 사진이면 핀 초기화
-    saveDeck(); showDeck();
+    saveDeck(); showDeck(); autoSaveTripMedia();
   }catch(e){
     alert('사진 처리 중 문제가 생겼어요.'); showDeck();
   }
@@ -1836,7 +1840,7 @@ document.getElementById('deckDelImg').onclick=async()=>{
   // 인터넷 창고에서도 지우기
   if(sb && deckImgPath){ try{ await sb.storage.from(PHOTO_BUCKET).remove([deckImgPath]); }catch(e){} }
   deckImg=null; deckImgPath=null; pins=[];
-  saveDeck(); showDeck();
+  saveDeck(); showDeck(); autoSaveTripMedia();
 };
 
 /* ================= 캠핑 사진 앨범 (Supabase Storage) ================= */
@@ -1852,12 +1856,12 @@ document.getElementById('albumPrivDefault').onchange = function(){
 document.getElementById('albumAllPublic').onclick = ()=>{
   if(typeof canEdit==='function' && !canEdit()) return;
   if(!album.length) return;
-  album.forEach(p=>p.private=false); saveAlbum(); renderAlbum();
+  album.forEach(p=>p.private=false); saveAlbum(); renderAlbum(); autoSaveTripMedia();
 };
 document.getElementById('albumAllPrivate').onclick = ()=>{
   if(typeof canEdit==='function' && !canEdit()) return;
   if(!album.length) return;
-  album.forEach(p=>p.private=true); saveAlbum(); renderAlbum();
+  album.forEach(p=>p.private=true); saveAlbum(); renderAlbum(); autoSaveTripMedia();
 };
 // 옛 형식(글자 덩어리)이 남아 있으면 빈 목록으로 정리
 if(album.length && typeof album[0] === 'string'){ album = []; store.set('camp_album', album); }
@@ -1916,7 +1920,7 @@ function renderAlbum(){
       if(typeof canEdit==='function' && !canEdit()) return;
       const i = el.dataset.priv;
       album[i].private = !album[i].private;
-      saveAlbum(); renderAlbum();
+      saveAlbum(); renderAlbum(); autoSaveTripMedia();
     };
   });
   g.querySelectorAll('button[data-del]').forEach(b=>{
@@ -1925,7 +1929,7 @@ function renderAlbum(){
       const p = album[b.dataset.del];
       // Storage에서도 지우기
       if(sb && p.path){ try{ await sb.storage.from(PHOTO_BUCKET).remove([p.path]); }catch(e){} }
-      album.splice(b.dataset.del,1); saveAlbum(); renderAlbum();
+      album.splice(b.dataset.del,1); saveAlbum(); renderAlbum(); autoSaveTripMedia();
     };
   });
 }
@@ -1959,8 +1963,34 @@ document.getElementById('albumFile').addEventListener('change', async function()
     note.textContent='사진 올리는 중… ('+done+'/'+files.length+')';
   }
   saveAlbum(); renderAlbum();
+  autoSaveTripMedia();     // 사진을 올렸으면 지금 캠핑에 바로 붙여 둔다
   if(failed) alert(failed+'장은 올리지 못했어요. supabase에 사진 방(camplog-photos)이 만들어져 있는지 확인해 주세요.');
 });
+
+/* 사진·영수증·배치도가 바뀌면 지금 작업 중인 캠핑에 즉시 반영 (저장 버튼 안 눌러도 안 사라지게) */
+function autoSaveTripMedia(){
+  if(!currentTripId){
+    // 아직 저장 안 된 새 캠핑 → 사용자에게 알려준다
+    const bar = document.getElementById('currentTripBar');
+    if(bar && !bar.dataset.warned){
+      bar.dataset.warned = '1';
+      const w = document.createElement('div');
+      w.className = 'ct-warn';
+      w.innerHTML = '⚠️ 아직 저장 안 된 새 캠핑이에요. 아래 <b>‘현재 내용 저장’</b>을 눌러야 사진이 남아요.';
+      bar.appendChild(w);
+    }
+    return;
+  }
+  const i = trips.findIndex(x=>x.id==currentTripId);
+  if(i < 0) return;
+  trips[i].album       = JSON.parse(JSON.stringify(album));
+  trips[i].receipts    = JSON.parse(JSON.stringify(receipts));
+  trips[i].settleFiles = JSON.parse(JSON.stringify(settleFiles));
+  trips[i].deckImg     = deckImg;
+  trips[i].deckImgPath = deckImgPath;
+  trips[i].deckPins    = JSON.parse(JSON.stringify(pins));
+  saveTrips();
+}
 
 /* ================= 비용 정산 ================= */
 let members = store.get('camp_members', []);      // ['나','철수']
@@ -1994,7 +2024,7 @@ function renderReceipts(){
     b.onclick=async()=>{
       const p=receipts[b.dataset.del];
       if(sb && p.path){ try{ await sb.storage.from(PHOTO_BUCKET).remove([p.path]); }catch(e){} }
-      receipts.splice(b.dataset.del,1); saveReceipts(); renderReceipts();
+      receipts.splice(b.dataset.del,1); saveReceipts(); renderReceipts(); autoSaveTripMedia();
     };
   });
 }
@@ -2015,7 +2045,7 @@ document.getElementById('receiptFile').addEventListener('change', async function
       }
     }catch(e){ failed++; }
   }
-  saveReceipts(); renderReceipts();
+  saveReceipts(); renderReceipts(); autoSaveTripMedia();
   if(failed) alert(failed+'장은 올리지 못했어요. supabase 사진 방 설정을 확인해 주세요.');
 });
 
@@ -2032,7 +2062,7 @@ function renderSettleFiles(){
     el.onclick=()=>{ const w=window.open(); if(w) w.document.write('<iframe src="'+settleFiles[el.dataset.open].data+'" style="width:100%;height:100%;border:none"></iframe>'); };
   });
   box.querySelectorAll('button[data-del]').forEach(b=>{
-    b.onclick=()=>{ settleFiles.splice(b.dataset.del,1); saveSettleFiles(); renderSettleFiles(); };
+    b.onclick=()=>{ settleFiles.splice(b.dataset.del,1); saveSettleFiles(); renderSettleFiles(); autoSaveTripMedia(); };
   });
 }
 document.getElementById('settleFileUp').addEventListener('change', function(){
@@ -2040,7 +2070,7 @@ document.getElementById('settleFileUp').addEventListener('change', function(){
   let left=files.length;
   files.forEach(f=>{
     const r=new FileReader();
-    r.onload=e=>{ settleFiles.push({name:f.name, data:e.target.result}); left--; if(left===0){ saveSettleFiles(); renderSettleFiles(); } };
+    r.onload=e=>{ settleFiles.push({name:f.name, data:e.target.result}); left--; if(left===0){ saveSettleFiles(); renderSettleFiles(); autoSaveTripMedia(); } };
     r.readAsDataURL(f);
   });
   this.value='';
@@ -2731,6 +2761,7 @@ function canSeeTripDetail(t){
 function renderCurrentTripBar(){
   const bar = document.getElementById('currentTripBar');
   if(!bar) return;
+  delete bar.dataset.warned;
   const t = currentTripId ? trips.find(x=>x.id==currentTripId) : null;
   if(t){
     bar.style.display='block';
