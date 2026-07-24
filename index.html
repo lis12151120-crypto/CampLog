@@ -334,6 +334,23 @@
   }
   .mp-item.on{background:var(--moss);color:#fff;border-color:var(--moss)}
 
+  /* ---- AX 참가자 안내 ---- */
+  .ax-notice{
+    margin-top:16px;padding:13px 15px;border-radius:11px;
+    background:#eef3ea;border:1px dashed var(--sage);
+    font-size:13px;color:var(--bark);line-height:1.7;text-align:center;
+  }
+  .ax-notice code{
+    background:#fff;border:1px solid var(--line);border-radius:5px;
+    padding:2px 7px;font-size:12.5px;color:var(--ember);font-weight:700;
+  }
+  .ax-fill{
+    display:block;width:100%;margin-top:11px;
+    background:var(--moss);color:#fff;border:none;border-radius:9px;
+    padding:10px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .ax-fill:hover{filter:brightness(1.07)}
+
   /* ---- 계정 역할 ---- */
   .role-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
   .role-badge.admin{background:#c96f3f;color:#fff}
@@ -516,8 +533,8 @@
         <label class="fld" for="authName">이름 <span style="color:var(--ember)">(관리자만 볼 수 있어요)</span></label>
         <input id="authName" placeholder="예) 정은희" autocomplete="name" />
       </div>
-      <label class="fld" for="authEmail">이메일</label>
-      <input id="authEmail" type="email" placeholder="example@email.com" autocomplete="email" />
+      <label class="fld" for="authEmail">이메일 또는 아이디</label>
+      <input id="authEmail" type="text" placeholder="example@email.com 또는 아이디" autocomplete="username" />
       <label class="fld" for="authPw">비밀번호</label>
       <input id="authPw" type="password" placeholder="6자 이상" autocomplete="current-password" />
       <div class="btn-row">
@@ -525,6 +542,11 @@
       </div>
       <div id="authMsg" style="font-size:13.5px;margin-top:12px;text-align:center;min-height:20px"></div>
       <div id="authHint" style="font-size:12.5px;color:var(--moss);margin-top:4px;text-align:center"></div>
+      <div class="ax-notice" id="axNotice">
+        <b>AX 프로젝트 참가자</b>이신가요?<br>
+        아이디 <code>aumleeax</code> · 비밀번호 <code>aumleeax!</code> 로 들어오세요.
+        <button class="ax-fill" id="axFill">눌러서 자동 입력</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2570,20 +2592,36 @@ function setAuthMode(m){
   document.getElementById('tabSignup').className = 'btn '+(m==='signup'?'btn-main':'btn-ghost');
   document.getElementById('authGo').textContent = (m==='login'?'로그인':'회원가입');
   document.getElementById('nameRow').style.display = (m==='signup') ? 'block' : 'none';
+  const ax = document.getElementById('axNotice');
+  if(ax) ax.style.display = (m==='signup') ? 'none' : 'block';
   document.getElementById('authMsg').textContent='';
   document.getElementById('authHint').textContent = (m==='signup')
     ? '가입하면 확인 메일이 갈 수 있어요. 메일의 링크를 누르면 가입이 끝나요.' : '';
 }
 document.getElementById('tabLogin').onclick=()=>setAuthMode('login');
 document.getElementById('tabSignup').onclick=()=>setAuthMode('signup');
+document.getElementById('axFill').onclick=()=>{
+  setAuthMode('login');
+  document.getElementById('authEmail').value='aumleeax';
+  document.getElementById('authPw').value='aumleeax!';
+  doAuth();
+};
 
 function showAuthMsg(txt, ok){
   const el=document.getElementById('authMsg');
   el.textContent=txt; el.style.color = ok ? 'var(--moss)' : 'var(--ember)';
 }
 
+/* 아이디만 적어도 되게: @가 없으면 공용 도메인을 붙여준다 */
+const SHARED_DOMAIN = '@camplog.app';
+function normalizeEmail(v){
+  const s = String(v||'').trim();
+  if(!s) return '';
+  return s.includes('@') ? s : (s + SHARED_DOMAIN);
+}
+
 async function doAuth(){
-  const email=document.getElementById('authEmail').value.trim();
+  const email=normalizeEmail(document.getElementById('authEmail').value);
   const pw=document.getElementById('authPw').value;
   const nm=document.getElementById('authName').value.trim();
   if(!email || !pw){ showAuthMsg('이메일과 비밀번호를 모두 입력해 주세요.'); return; }
