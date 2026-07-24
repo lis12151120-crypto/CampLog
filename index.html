@@ -863,6 +863,10 @@
     <h2><span class="ico">📌</span> 이 캠핑 저장하기</h2>
     <p class="hint">날짜는 위 <b>캠핑 날짜</b> 칸에서 정해요. 여기서 나머지를 채우고 저장하면 목록에 남아요.</p>
     <div id="dateEcho" class="date-echo"></div>
+    <div class="private-hidden viewer-only" style="display:none">
+      🔒 개인정보 보호를 위해 동행자 정보와 저장 기능은 열람자에게 표시되지 않습니다.
+    </div>
+    <div class="hide-for-viewer">
     <label class="fld" for="tripWith">누구랑 / 메모</label>
     <input id="tripWith" placeholder="예) 가족과 함께" />
 
@@ -877,8 +881,9 @@
     <div class="btn-row">
       <button class="btn btn-main" id="tripSave">현재 내용 저장</button>
     </div>
+    </div><!-- /hide-for-viewer -->
     <div id="tripList"></div>
-    <div class="save-note">모든 내용은 이 기기 안에만 저장돼요. 다른 사람은 볼 수 없어요.</div>
+    <div class="save-note">기록은 인터넷에 안전하게 저장되고, 권한이 있는 사람만 볼 수 있어요.</div>
   </section>
 
   <!-- 8. 전체 지도 (다녀온 곳 한눈에) -->
@@ -2681,6 +2686,11 @@ async function loadAccounts(){
 function renderTripMemberPicks(){
   const box = document.getElementById('tripMemberPicks');
   if(!box) return;
+  // 열람자에게는 사람 이름을 아예 그리지 않는다 (개인정보 보호)
+  if(typeof canEdit === 'function' && !canEdit()){
+    box.innerHTML = '';
+    return;
+  }
   // 관리자 본인은 항상 볼 수 있으니 목록에서 제외, 열람자도 제외
   const pickable = allAccounts.filter(a =>
     a.user_id !== (currentUser && currentUser.id) && a.role !== 'viewer');
