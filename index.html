@@ -343,6 +343,14 @@
   .acct{display:flex;align-items:center;gap:10px;justify-content:space-between;
     border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-top:8px;background:#fffdf7}
   .acct-info{flex:1;font-size:14px;color:var(--bark);word-break:break-all}
+  .acct-mail{display:block;font-size:12px;color:#9c9684;margin-top:2px}
+  .acct-noname{color:#b6ab90;font-weight:400}
+  .acct-edit{
+    background:#fff;border:1px solid var(--sage);color:var(--bark);
+    border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer;
+    font-family:inherit;flex:0 0 auto;
+  }
+  .acct-edit:hover{background:var(--blue-soft,#eef3ea)}
   .acct-me{font-size:11px;background:var(--moss);color:#fff;padding:1px 7px;border-radius:999px;margin-left:7px}
   .acct-sel{width:auto;flex:0 0 auto;font-size:13.5px;padding:7px 10px}
   /* 열람자에게 가려지는 부분 */
@@ -503,6 +511,10 @@
       <div id="authTabs" style="display:flex;gap:8px;margin-bottom:14px">
         <button class="btn btn-main" id="tabLogin" style="flex:1">로그인</button>
         <button class="btn btn-ghost" id="tabSignup" style="flex:1">회원가입</button>
+      </div>
+      <div id="nameRow" style="display:none">
+        <label class="fld" for="authName">이름 <span style="color:var(--ember)">(관리자만 볼 수 있어요)</span></label>
+        <input id="authName" placeholder="예) 정은희" autocomplete="name" />
       </div>
       <label class="fld" for="authEmail">이메일</label>
       <input id="authEmail" type="email" placeholder="example@email.com" autocomplete="email" />
@@ -2557,6 +2569,7 @@ function setAuthMode(m){
   document.getElementById('tabLogin').className = 'btn '+(m==='login'?'btn-main':'btn-ghost');
   document.getElementById('tabSignup').className = 'btn '+(m==='signup'?'btn-main':'btn-ghost');
   document.getElementById('authGo').textContent = (m==='login'?'로그인':'회원가입');
+  document.getElementById('nameRow').style.display = (m==='signup') ? 'block' : 'none';
   document.getElementById('authMsg').textContent='';
   document.getElementById('authHint').textContent = (m==='signup')
     ? '가입하면 확인 메일이 갈 수 있어요. 메일의 링크를 누르면 가입이 끝나요.' : '';
@@ -2572,18 +2585,24 @@ function showAuthMsg(txt, ok){
 async function doAuth(){
   const email=document.getElementById('authEmail').value.trim();
   const pw=document.getElementById('authPw').value;
+  const nm=document.getElementById('authName').value.trim();
   if(!email || !pw){ showAuthMsg('이메일과 비밀번호를 모두 입력해 주세요.'); return; }
   if(pw.length<6){ showAuthMsg('비밀번호는 6자 이상이어야 해요.'); return; }
+  if(authMode==='signup' && !nm){ showAuthMsg('이름을 적어 주세요. 관리자만 볼 수 있어요.'); return; }
   document.getElementById('authGo').disabled=true;
   showAuthMsg('잠시만요…', true);
   try{
     if(authMode==='signup'){
-      const { data, error } = await sb.auth.signUp({ email, password: pw });
+      const { data, error } = await sb.auth.signUp({
+        email, password: pw,
+        options:{ data:{ full_name: nm } }
+      });
       if(error){ showAuthMsg(translateErr(error.message)); }
       else if(data.user && !data.session){
         showAuthMsg('가입 확인 메일을 보냈어요. 메일함에서 링크를 누른 뒤 로그인해 주세요.', true);
         setAuthMode('login');
       }else{
+        pendingName = nm;          // 역할 등록할 때 함께 저장
         onLoggedIn(data.user);
       }
     }else{
@@ -2616,7 +2635,7 @@ let tripPickedIds = [];      // 이번 캠핑에 함께 간 사람들의 user_id
 async function loadAccounts(){
   if(!sb || !currentUser) return;
   try{
-    const { data } = await sb.from('camplog_roles').select('user_id,email,role');
+    const { data } = await sb.from('camplog_roles').select('user_id,email,role,name');
     allAccounts = data || [];
   }catch(e){ allAccounts = []; }
 }
@@ -2631,10 +2650,11 @@ function renderTripMemberPicks(){
     box.innerHTML = '<span class="mp-empty">아직 함께할 팀원이 없어요. 함께 갈 분이 회원가입하고, 위 ⚙️ 계정 관리에서 <b>팀원</b>으로 바꾸면 여기에 나타나요.</span>';
     return;
   }
-  box.innerHTML = pickable.map(a=>
-    '<span class="mp-item'+(tripPickedIds.includes(a.user_id)?' on':'')+'" data-uid="'+a.user_id+'">'
-    + (a.email||'(이름 없음)') + '</span>'
-  ).join('');
+  box.innerHTML = pickable.map(a=>{
+    const label = (a.name||'').trim() || a.email || '(이름 없음)';
+    return '<span class="mp-item'+(tripPickedIds.includes(a.user_id)?' on':'')+'" data-uid="'+a.user_id+'" title="'+(a.email||'')+'">'
+      + label + '</span>';
+  }).join('');
   box.querySelectorAll('.mp-item').forEach(el=>{
     el.onclick=()=>{
       if(!canEdit()) return;
@@ -2709,6 +2729,8 @@ function startNewTrip(){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+let pendingName = '';   // 가입 직후 저장할 이름
+
 async function loadMyRole(){
   myRole = 'viewer';
   if(!sb || !currentUser) return;
@@ -2716,10 +2738,14 @@ async function loadMyRole(){
     const { data } = await sb.from('camplog_roles')
       .select('role').eq('user_id', currentUser.id).maybeSingle();
     if(data && data.role){ myRole = data.role; return; }
-    // 처음 로그인한 사람 → 열람자로 등록
+    // 처음 로그인한 사람 → 열람자로 등록 (이름도 함께)
+    const nm = pendingName
+      || (currentUser.user_metadata && currentUser.user_metadata.full_name)
+      || '';
     await sb.from('camplog_roles').insert({
-      user_id: currentUser.id, email: currentUser.email, role: 'viewer'
+      user_id: currentUser.id, email: currentUser.email, role: 'viewer', name: nm
     });
+    pendingName = '';
     myRole = 'viewer';
   }catch(e){ myRole = 'viewer'; }
 }
@@ -2765,19 +2791,36 @@ async function renderAdminPanel(){
   box.innerHTML = '<div class="empty">계정을 불러오는 중…</div>';
   try{
     const { data, error } = await sb.from('camplog_roles')
-      .select('user_id,email,role').order('role');
+      .select('user_id,email,role,name').order('role');
     if(error || !data){ box.innerHTML='<div class="empty">계정 목록을 못 불러왔어요.</div>'; return; }
     box.innerHTML = data.map(u=>{
       const me = (u.user_id===currentUser.id);
+      const nm = (u.name||'').trim();
       return '<div class="acct">'
-        +'<div class="acct-info"><b>'+(u.email||'(이메일 없음)')+'</b>'
-          +(me?'<span class="acct-me">나</span>':'')+'</div>'
+        +'<div class="acct-info">'
+          +'<b>'+(nm || '<span class="acct-noname">이름 없음</span>')+'</b>'
+          +(me?'<span class="acct-me">나</span>':'')
+          +'<span class="acct-mail">'+(u.email||'')+'</span>'
+        +'</div>'
+        +'<button class="acct-edit" data-name="'+u.user_id+'" data-cur="'+nm.replace(/"/g,'&quot;')+'">이름</button>'
         +'<select class="acct-sel" data-uid="'+u.user_id+'"'+(me?' disabled':'')+'>'
           +'<option value="admin"'+(u.role==='admin'?' selected':'')+'>관리자</option>'
           +'<option value="member"'+(u.role==='member'?' selected':'')+'>팀원</option>'
           +'<option value="viewer"'+(u.role==='viewer'?' selected':'')+'>열람자</option>'
         +'</select></div>';
     }).join('') || '<div class="empty">아직 가입한 사람이 없어요.</div>';
+
+    // 이름 고치기
+    box.querySelectorAll('.acct-edit').forEach(b=>{
+      b.onclick=async()=>{
+        const v = prompt('이 분의 이름을 적어 주세요.\n(관리자만 볼 수 있어요)', b.dataset.cur||'');
+        if(v===null) return;
+        const { error } = await sb.from('camplog_roles')
+          .update({name: v.trim()}).eq('user_id', b.dataset.name);
+        if(error) alert('이름을 저장하지 못했어요.');
+        else { await loadAccounts(); renderAdminPanel(); renderTripMemberPicks(); }
+      };
+    });
 
     box.querySelectorAll('.acct-sel').forEach(sel=>{
       sel.onchange=async()=>{
@@ -2814,6 +2857,7 @@ document.getElementById('logoutBtn').onclick=async()=>{
   document.getElementById('mainApp').style.display='none';
   document.getElementById('authScreen').style.display='block';
   document.getElementById('authEmail').value='';
+  document.getElementById('authName').value='';
   document.getElementById('authPw').value='';
   setAuthMode('login');
 };
