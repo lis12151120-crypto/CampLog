@@ -221,6 +221,26 @@
   }
   .trip .th{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .trip .th b{font-size:16px;color:var(--bark)}
+  /* ---- 목록에서 바로 보는 사진·배치도 ---- */
+  .trip-media{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .tm-sec{margin-bottom:14px}
+  .tm-sec:last-child{margin-bottom:0}
+  .tm-title{font-size:13px;color:var(--bark);font-weight:700;margin-bottom:7px}
+  .tm-nos{background:var(--ember);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px;margin-left:6px;font-weight:700}
+  .tm-note{font-size:11.5px;color:#9c9684;font-weight:400;margin-left:5px}
+  .tm-deck{position:relative;display:inline-block;width:100%;border:1px solid var(--line);border-radius:10px;overflow:hidden;line-height:0}
+  .tm-deck img{width:100%;display:block}
+  .tm-pin{position:absolute;transform:translate(-50%,-100%);font-size:18px;line-height:normal;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+  .tm-pin-cap{position:absolute;top:-4px;left:50%;transform:translateX(-50%);
+    background:var(--ember);color:#fff;font-size:9px;font-weight:700;padding:0 5px;border-radius:999px}
+  .tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:7px}
+  .tm-ph{display:block;aspect-ratio:1/1;border-radius:9px;overflow:hidden;border:1px solid var(--line)}
+  .tm-ph img{width:100%;height:100%;object-fit:cover}
+  .tm-lock{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:#e5dcc4;border:1px dashed var(--sage);color:#9c9684;font-size:17px}
+  .tm-lock span{font-size:10px;margin-top:2px}
+
   /* ---- 캠핑장별 방문 횟수 ---- */
   .visit-summary{
     background:linear-gradient(135deg,#fff9ec,#f1ead8);
@@ -2389,6 +2409,7 @@ function renderTrips(){
       +(t.addr && t.addr!==t.place ? '<div style="font-size:12.5px;color:#9c9684;margin-top:2px">📍 '+t.addr+'</div>' : '')
       +'<div class="meta">'+withHtml+nightsTxt2+wxTxt+deckTxt+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
       +'<div class="tbtns">'
+      + ((t.album&&t.album.length)||t.deckImg ? '<button class="btn btn-ghost" data-media="'+t.id+'">📸 사진·배치도 보기</button>' : '')
       + (detail ? '<button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>' : '')
       + (canEdit() ? '<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>' : '')
       + ((isAdmin() || (detail && canEdit())) ? '<button class="btn btn-ghost" data-del="'+t.id+'">삭제</button>' : '')
@@ -2501,6 +2522,50 @@ function renderTrips(){
     renderMembers(); renderExpenses(); renderSettle(); renderReceipts(); renderSettleFiles(); renderAlbum(); renderCurrentTripBar();
     window.scrollTo({top:0,behavior:'smooth'});
   }
+
+  // 📸 사진·배치도 보기 (불러오기 없이 그 자리에서 펼침)
+  box.querySelectorAll('[data-media]').forEach(b=>{
+    b.onclick=()=>{
+      const t = trips.find(x=>x.id==b.dataset.media); if(!t) return;
+      const card = b.closest('.trip');
+      const old = card.querySelector('.trip-media');
+      if(old){ old.remove(); b.textContent='📸 사진·배치도 보기'; return; }
+
+      const seeAll = (typeof canSeeTripDetail==='function') ? canSeeTripDetail(t) : true;
+      let html = '<div class="trip-media">';
+
+      // 배치도
+      if(t.deckImg){
+        const nos = (t.deckPins||[]).map((p,i)=>String(p.no||'').trim()||('핀'+(i+1)));
+        html += '<div class="tm-sec"><div class="tm-title">🗺️ 데크 배치도'
+             + (nos.length?(' <span class="tm-nos">'+nos.join(', ')+'</span>'):'') + '</div>'
+             + '<div class="tm-deck"><img src="'+t.deckImg+'" loading="lazy">'
+             + (t.deckPins||[]).map((p,i)=>
+                 '<span class="tm-pin" style="left:'+(p.x*100)+'%;top:'+(p.y*100)+'%">'
+                 +'<span class="tm-pin-cap">'+(i+1)+'</span>⛺</span>'
+               ).join('')
+             + '</div></div>';
+      }
+      // 사진
+      const photos = t.album || [];
+      if(photos.length){
+        html += '<div class="tm-sec"><div class="tm-title">📸 캠핑 사진 '
+             + (seeAll ? '' : '<span class="tm-note">(비공개 사진은 가려져요)</span>') + '</div>'
+             + '<div class="tm-grid">'
+             + photos.map(p=>{
+                 if(p.private && !seeAll){
+                   return '<div class="tm-ph tm-lock">🔒<span>비공개</span></div>';
+                 }
+                 return '<a class="tm-ph" href="'+p.url+'" target="_blank" rel="noopener">'
+                      + '<img src="'+p.url+'" loading="lazy"></a>';
+               }).join('')
+             + '</div></div>';
+      }
+      html += '</div>';
+      card.insertAdjacentHTML('beforeend', html);
+      b.textContent='📸 닫기';
+    };
+  });
 
   box.querySelectorAll('[data-load]').forEach(b=>{
     b.onclick=()=>{
