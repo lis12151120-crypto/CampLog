@@ -701,6 +701,7 @@
   <section class="card">
     <h2><span class="ico">📅</span> 캠핑 날짜 & 날씨</h2>
     <p class="hint">캠핑 날짜를 정하면 <b>그날 날씨</b>를 확인해 기록으로 남길 수 있어요. (지난 날짜는 실제 날씨, 앞날은 예보)</p>
+    <div class="hide-for-viewer">
     <div class="two">
       <div>
         <label class="fld" for="tripDate">시작 날짜</label>
@@ -712,7 +713,8 @@
       </div>
     </div>
     <div id="nightsLabel" style="font-size:13.5px;color:var(--ember);font-weight:600;margin-top:8px"></div>
-    <div class="btn-row">
+    </div>
+    <div class="btn-row hide-for-viewer">
       <button class="btn btn-ember" id="wxDayBtn">이 날짜의 날씨 기록하기</button>
       <button class="btn btn-ghost" id="wxBtn">앞으로 7일 날씨 보기</button>
     </div>
@@ -1229,7 +1231,7 @@ function renderDayWeather(isPast, fromCache){
     '<div class="wx-day-card">'
       +'<div class="wx-day-emo">'+emo+'</div>'
       +'<div class="wx-day-info">'
-        +'<div class="wx-day-date">'+dstr+' '+tag+'</div>'
+        +'<div class="wx-day-date">'+(((typeof canEdit==='function')&&!canEdit())?'':(dstr+' '))+tag+'</div>'
         +'<div class="wx-day-temp"><b>'+hi+'</b> / '+lo+' · '+desc+'</div>'
         +'<div class="wx-day-rain">'+rainTxt+'</div>'
       +'</div>'
@@ -2361,13 +2363,17 @@ function renderTrips(){
       const hi = t.weather.tmax==null?'':Math.round(t.weather.tmax)+'°';
       wxTxt = ' · '+we+' '+hi;
     }
-    // 여러 번 간 곳이면 "N번째" 배지
+    // 여러 번 간 곳이면 "N번째" 배지 (열람자에겐 숨김)
+    const viewerMode2 = (typeof canEdit==='function') && !canEdit();
     const k = placeKey(t);
     const total = visitCount[k] || 1;
     const nth = orderNo[t.id] || 1;
-    const visitBadge = (total > 1)
+    const visitBadge = (!viewerMode2 && total > 1)
       ? '<span class="visit-badge" title="이 캠핑장 '+total+'번 중 '+nth+'번째">'+nth+'번째</span>'
       : '';
+    // 날짜: 열람자에겐 안 보임
+    const whenTxt = viewerMode2 ? '' : fmt(t);
+    const nightsTxt2 = viewerMode2 ? '' : nights;
     // 데크: 번호가 적혀 있으면 번호를, 없으면 개수를 보여준다
     let deckTxt = '';
     if(t.deckPins && t.deckPins.length){
@@ -2379,9 +2385,9 @@ function renderTrips(){
     // 내가 함께 간 캠핑이면 표시
     const joinBadge = (detail && !isAdmin() && myRole==='member')
       ? '<span class="join-badge">함께 간 캠핑</span>' : '';
-    return '<div class="trip'+(detail?'':' trip-dim')+'"><div class="th"><b>'+(t.place||'캠핑')+visitBadge+joinBadge+'</b><span class="when">'+fmt(t)+'</span></div>'
+    return '<div class="trip'+(detail?'':' trip-dim')+'"><div class="th"><b>'+(t.place||'캠핑')+visitBadge+joinBadge+'</b><span class="when">'+whenTxt+'</span></div>'
       +(t.addr && t.addr!==t.place ? '<div style="font-size:12.5px;color:#9c9684;margin-top:2px">📍 '+t.addr+'</div>' : '')
-      +'<div class="meta">'+withHtml+nights+wxTxt+deckTxt+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
+      +'<div class="meta">'+withHtml+nightsTxt2+wxTxt+deckTxt+spentTxt+' · 준비물 '+done+'/'+t.checklist.length+' 챙김</div>'
       +'<div class="tbtns">'
       + (detail ? '<button class="btn btn-ghost" data-load="'+t.id+'">이 내용 불러오기</button>' : '')
       + (canEdit() ? '<button class="btn btn-ghost" data-copy="'+t.id+'">복사해 새 캠핑</button>' : '')
@@ -2396,17 +2402,34 @@ function renderTrips(){
     .map(k=>({key:k, name:placeLabel[k], n:visitCount[k]}))
     .sort((a,b)=> b.n - a.n || a.name.localeCompare(b.name,'ko'));
   if(rank.length){
-    const repeat = rank.filter(r=>r.n>1).length;
-    html += '<div class="visit-summary">'
-      + '<div class="vs-title">📊 캠핑장별 다녀온 횟수 <small>총 '+visibleTrips.length+'번 · '+rank.length+'곳'
-      + (repeat?(' · 다시 간 곳 '+repeat+'곳'):'') + '</small></div>'
-      + '<div class="vs-list">'
-      + rank.map(r=>
-          '<span class="vs-item'+(r.n>1?' many':'')+'">'+r.name+' <b>'+r.n+'번</b></span>'
-        ).join('')
-      + '</div></div>';
+    const viewerMode = (typeof canEdit==='function') && !canEdit();
+    if(viewerMode){
+      // 열람자: 횟수 없이 다녀온 캠핑장 이름만
+      html += '<div class="visit-summary">'
+        + '<div class="vs-title">📍 다녀온 캠핑장 <small>'+rank.length+'곳</small></div>'
+        + '<div class="vs-list">'
+        + rank.map(r=>'<span class="vs-item">'+r.name+'</span>').join('')
+        + '</div></div>';
+    }else{
+      const repeat = rank.filter(r=>r.n>1).length;
+      html += '<div class="visit-summary">'
+        + '<div class="vs-title">📊 캠핑장별 다녀온 횟수 <small>총 '+visibleTrips.length+'번 · '+rank.length+'곳'
+        + (repeat?(' · 다시 간 곳 '+repeat+'곳'):'') + '</small></div>'
+        + '<div class="vs-list">'
+        + rank.map(r=>
+            '<span class="vs-item'+(r.n>1?' many':'')+'">'+r.name+' <b>'+r.n+'번</b></span>'
+          ).join('')
+        + '</div></div>';
+    }
   }
 
+  const viewerList = (typeof canEdit==='function') && !canEdit();
+  if(viewerList){
+    // 열람자: 날짜로 나누지 않고 캠핑장 목록만
+    const all = [...upcoming, ...past, ...undated];
+    html += '<div class="trip-group"><div class="group-title">🏕️ 캠핑 기록 <small>'+all.length+'곳</small></div>'
+      + all.map(card).join('') + '</div>';
+  }else{
   if(upcoming.length){
     html += '<div class="trip-group"><div class="group-title">🎒 가기로 한 캠핑 <small>'+upcoming.length+'곳</small></div>'
       + upcoming.map(card).join('') + '</div>';
@@ -2418,6 +2441,7 @@ function renderTrips(){
   if(undated.length){
     html += '<div class="trip-group"><div class="group-title">📎 날짜 미정 <small>'+undated.length+'곳</small></div>'
       + undated.map(card).join('') + '</div>';
+  }
   }
   box.innerHTML = html;
 
@@ -2992,7 +3016,10 @@ document.getElementById('allMapBtn').onclick = function(){
   spots.forEach(t=>{
     let when='';
     if(t.date){ const d=new Date(t.date); when=(d.getMonth()+1)+'월 '+d.getDate()+'일'; }
-    const popup='<b>'+(t.place||'캠핑')+'</b>'+(when?('<br>'+when):'')+(t.with?('<br>'+t.with):'');
+    const vOnly = (typeof canEdit==='function') && !canEdit();
+    const popup='<b>'+(t.place||'캠핑')+'</b>'
+      + (!vOnly && when ? ('<br>'+when) : '')
+      + (!vOnly && t.with ? ('<br>'+t.with) : '');
     const mk=L.marker([t.lat,t.lon]).addTo(allMap).bindPopup(popup);
     allMapMarkers.push(mk);
   });
